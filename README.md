@@ -6,7 +6,7 @@ MVP funcional en Next.js + TypeScript para pasar de un plano arquitectónico a u
 
 1. Se carga JPG, PNG o PDF y, para imágenes, se puede rotar o recortar bordes antes de enviar.
 2. El servidor valida tipo, tamaño, página PDF, límite de solicitudes y responde con error si falta configuración.
-3. Con `OPENAI_API_KEY`, el servidor envía el plano al proveedor de visión configurable y exige un JSON Schema validado con ambientes, muros, aberturas, evidencia, faltantes y preguntas.
+3. Con `OPENAI_API_KEY` o `GEMINI_API_KEY` + `VISION_PROVIDER=gemini`, el servidor envía el plano al proveedor de visión seleccionado y exige un JSON Schema validado con ambientes, muros, aberturas, evidencia, faltantes y preguntas.
 4. La interfaz muestra el plano, referencias visuales, estados `detectado`, `confirmado`, `supuesto` y `pendiente`, y una revisión editable.
 5. El motor de cálculo está separado de la IA. Cuenta cada muro una vez, descuenta aberturas, calcula caras de pintura seleccionadas y conserva cómputos parciales.
 6. El proyecto y el archivo original se guardan en `data/material-plans/`. Se puede descargar un respaldo JSON y exportar el cómputo a CSV.
@@ -25,13 +25,21 @@ npm run dev
 
 Abrir <http://localhost:3000>.
 
-Configuración mínima para lectura real:
+Configuración mínima para lectura real con OpenAI:
 
 ```dotenv
 OPENAI_API_KEY="..."
 VISION_MODEL="gpt-4.1-mini"
 # opcional, para un endpoint compatible con Responses API
 VISION_API_URL="https://api.openai.com/v1/responses"
+```
+
+Alternativa con Google AI Studio:
+
+```dotenv
+VISION_PROVIDER="gemini"
+GEMINI_API_KEY="..."
+GEMINI_MODEL="gemini-2.5-flash"
 ```
 
 La clave nunca llega al navegador. El archivo sí se envía al proveedor de IA configurado; la interfaz lo informa antes de usar el flujo. El proyecto y el original quedan además en almacenamiento local.
@@ -44,7 +52,7 @@ npm test
 npm run build
 ```
 
-La suite incluye 13 pruebas: fórmulas conocidas, un monoambiente controlado, aberturas, caras de pintura, faltantes, cómputo parcial, validación de entradas, perímetro, protección de rutas de almacenamiento, contrato del proveedor de visión y diagnóstico de configuración.
+La suite incluye 14 pruebas: fórmulas conocidas, un monoambiente controlado, aberturas, caras de pintura, faltantes, cómputo parcial, validación de entradas, perímetro, protección de rutas de almacenamiento, contratos OpenAI/Gemini y diagnóstico de configuración.
 
 ## Limitaciones conocidas
 

@@ -14,7 +14,9 @@ function extractionErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   if (message === "VISION_API_KEY_MISSING") return "Falta configurar OPENAI_API_KEY en Vercel. No se puede analizar un archivo nuevo hasta configurarla.";
   if (message === "VISION_API_KEY_INVALID_FORMAT") return "OPENAI_API_KEY no parece una clave OpenAI válida. En Vercel reemplazá el token JWT por una clave que empiece con sk-.";
-  if (message.startsWith("VISION_PROVIDER_401") || message.startsWith("VISION_PROVIDER_403")) return "OPENAI_API_KEY fue rechazada por el proveedor. En Vercel pegala sin comillas ni espacios y verificá que tenga acceso al modelo configurado.";
+  if (message === "VISION_GEMINI_API_KEY_MISSING") return "Falta configurar GEMINI_API_KEY en Vercel para usar el proveedor Gemini.";
+  if (message === "VISION_PROVIDER_UNSUPPORTED") return "El proveedor de visión configurado no está soportado. Usá VISION_PROVIDER=openai o gemini.";
+  if (message.startsWith("VISION_PROVIDER_401") || message.startsWith("VISION_PROVIDER_403")) return "La credencial del proveedor de visión fue rechazada. Revisá la clave, el modelo y los permisos de la cuenta.";
   if (message.startsWith("VISION_PROVIDER_429")) return "El proveedor rechazó la solicitud por límite o saldo insuficiente. Revisá la cuota de la cuenta de IA.";
   if (message === "VISION_INVALID_JSON") return "El proveedor devolvió una respuesta que no cumple el formato esperado.";
   if (message === "VISION_EMPTY_RESPONSE") return "La API no devolvió una interpretación utilizable.";

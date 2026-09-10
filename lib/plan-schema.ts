@@ -83,3 +83,24 @@ export const visionJsonSchema = {
     settings: { type: "object", additionalProperties: false, required: ["wallHeightM", "floorMaterial", "floorCoverageM2PerBox", "floorWastePercent", "brickMaterial", "bricksPerM2", "brickWastePercent", "paintMaterial", "paintCoverageM2PerL", "paintCoats", "paintWastePercent"], properties: { wallHeightM: { type: ["number", "null"] }, floorMaterial: { type: "string" }, floorCoverageM2PerBox: { type: ["number", "null"] }, floorWastePercent: { type: "number" }, brickMaterial: { type: "string" }, bricksPerM2: { type: ["number", "null"] }, brickWastePercent: { type: "number" }, paintMaterial: { type: "string" }, paintCoverageM2PerL: { type: ["number", "null"] }, paintCoats: { type: ["number", "null"] }, paintWastePercent: { type: "number" } } },
   },
 } as const;
+
+function toGeminiSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(toGeminiSchema);
+  if (!value || typeof value !== "object") return value;
+  const source = value as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  const rawType = source.type;
+  if (Array.isArray(rawType)) {
+    const nonNullType = rawType.find((type): type is string => type !== "null");
+    if (nonNullType) result.type = nonNullType.toUpperCase();
+    if (rawType.includes("null")) result.nullable = true;
+  }
+  for (const [key, child] of Object.entries(source)) {
+    if (key === "type" || key === "additionalProperties" || key === "strict") continue;
+    result[key] = toGeminiSchema(child);
+  }
+  if (typeof rawType === "string") result.type = rawType.toUpperCase();
+  return result;
+}
+
+export const geminiJsonSchema = toGeminiSchema(visionJsonSchema);

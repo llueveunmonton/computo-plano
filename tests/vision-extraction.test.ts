@@ -34,4 +34,16 @@ describe("contrato del proveedor de visión", () => {
     expect(visionIsConfigured()).toBe(false);
     expect(visionConfigurationError()).toContain("token JWT");
   });
+
+  it("extrae una interpretación usando Gemini con JSON estructurado", async () => {
+    vi.stubEnv("VISION_PROVIDER", "gemini");
+    vi.stubEnv("GEMINI_API_KEY", "AIza-test");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(demoInterpretation) }] } }] }), { status: 200 })));
+
+    const result = await extractPlanWithVision(requestInput);
+
+    expect(visionIsConfigured()).toBe(true);
+    expect(result.rooms[0].name).toBe("Monoambiente");
+    expect(vi.mocked(fetch).mock.calls[0][0]).toContain("generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
+  });
 });
