@@ -97,6 +97,10 @@ function toGeminiSchema(value: unknown): unknown {
   }
   for (const [key, child] of Object.entries(source)) {
     if (key === "type" || key === "additionalProperties" || key === "strict") continue;
+    if (key === "properties" && child && typeof child === "object" && !Array.isArray(child)) {
+      result.properties = Object.fromEntries(Object.entries(child).map(([propertyName, propertySchema]) => [propertyName, toGeminiSchema(propertySchema)]));
+      continue;
+    }
     result[key] = toGeminiSchema(child);
   }
   if (typeof rawType === "string") result.type = rawType.toUpperCase();
