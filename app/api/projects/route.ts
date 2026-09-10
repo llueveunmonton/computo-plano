@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { extractPlanWithVision, visionConfigurationError, visionIsConfigured } from "@/lib/vision-extraction";
-import { listProjects, saveProject, uploadPath } from "@/lib/plan-storage";
+import { ensurePlanStorage, listProjects, saveProject, uploadPath } from "@/lib/plan-storage";
 import { rateLimited } from "@/lib/request-rate-limit";
 import type { PlanProject } from "@/lib/plan";
 
@@ -45,6 +45,7 @@ export async function POST(request: Request) {
   try {
     const interpretation = await extractPlanWithVision({ bytes, mimeType: file.type, fileName: file.name, selectedPage });
     const project: PlanProject = { id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), name: file.name.replace(/\.[^.]+$/, ""), originalFileName: file.name, fileType: file.type, filePath: `data/material-plans/uploads/${storedName}`, selectedPage, isDemo: false, extractionMode: "vision", interpretation, calculation: null };
+    await ensurePlanStorage();
     await (await import("node:fs/promises")).writeFile(uploadPath(storedName), bytes);
     await saveProject(project);
     return NextResponse.json({ project });
