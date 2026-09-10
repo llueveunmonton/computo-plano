@@ -2,49 +2,1394 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, DragEvent, FormEvent } from "react";
-import { calculateMaterials, type DataStatus, type PlanInterpretation, type PlanProject, type Room, type Wall } from "@/lib/plan";
+import {
+  calculateMaterials,
+  type DataStatus,
+  type PlanInterpretation,
+  type PlanProject,
+  type Room,
+  type Wall,
+} from "@/lib/plan";
 
-const statusLabel: Record<DataStatus, string> = { detectado: "Detectado", confirmado: "Confirmado", supuesto: "Supuesto", pendiente: "Pendiente" };
-const statusClass: Record<DataStatus, string> = { detectado: "status-detected", confirmado: "status-confirmed", supuesto: "status-assumed", pendiente: "status-pending" };
+const statusLabel: Record<DataStatus, string> = {
+  detectado: "Detectado",
+  confirmado: "Confirmado",
+  supuesto: "Supuesto",
+  pendiente: "Pendiente",
+};
+const statusClass: Record<DataStatus, string> = {
+  detectado: "status-detected",
+  confirmado: "status-confirmed",
+  supuesto: "status-assumed",
+  pendiente: "status-pending",
+};
 const SAMPLE_PLAN = "/demo/monoambiente-demo.svg";
-function moneyDate(value: string) { return new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
-function decimal(value: number | null) { return value === null ? "—" : new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(value); }
-function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
+function moneyDate(value: string) {
+  return new Intl.DateTimeFormat("es-AR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+function decimal(value: number | null) {
+  return value === null
+    ? "—"
+    : new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(
+        value,
+      );
+}
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
 
 async function prepareImage(file: File, rotation: number, cropInset: number) {
   if (!file.type.startsWith("image/") || (!rotation && !cropInset)) return file;
-  const source = await createImageBitmap(file); const cropX = source.width * cropInset; const cropY = source.height * cropInset; const width = source.width - cropX * 2; const height = source.height - cropY * 2;
-  const canvas = document.createElement("canvas"); canvas.width = rotation % 180 ? height : width; canvas.height = rotation % 180 ? width : height; const context = canvas.getContext("2d"); if (!context) return file;
-  context.translate(canvas.width / 2, canvas.height / 2); context.rotate((rotation * Math.PI) / 180); context.drawImage(source, cropX, cropY, width, height, -width / 2, -height / 2, width, height);
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, file.type === "image/png" ? "image/png" : "image/jpeg", 0.92)); return blob ? new File([blob], file.name, { type: blob.type }) : file;
+  const source = await createImageBitmap(file);
+  const cropX = source.width * cropInset;
+  const cropY = source.height * cropInset;
+  const width = source.width - cropX * 2;
+  const height = source.height - cropY * 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = rotation % 180 ? height : width;
+  canvas.height = rotation % 180 ? width : height;
+  const context = canvas.getContext("2d");
+  if (!context) return file;
+  context.translate(canvas.width / 2, canvas.height / 2);
+  context.rotate((rotation * Math.PI) / 180);
+  context.drawImage(
+    source,
+    cropX,
+    cropY,
+    width,
+    height,
+    -width / 2,
+    -height / 2,
+    width,
+    height,
+  );
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(
+      resolve,
+      file.type === "image/png" ? "image/png" : "image/jpeg",
+      0.92,
+    ),
+  );
+  return blob ? new File([blob], file.name, { type: blob.type }) : file;
 }
-function demoSvg() { return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"><rect width="800" height="500" fill="#fbfaf5"/><g stroke="#172a35" stroke-width="7" fill="none"><path d="M80 70H720V430H80Z"/><path d="M480 70V430M80 270H480"/></g><g fill="#4d6570" font-family="sans-serif" font-size="24"><text x="180" y="180">ESTAR-COMEDOR</text><text x="570" y="180">DORMITORIO</text><text x="190" y="365">5,00 m</text><text x="550" y="365">3,00 m</text></g><g stroke="#e56d3b" stroke-width="4"><path d="M240 70v-25M240 45h240M480 45v25"/><path d="M510 270v-25M510 245h160M670 245v25"/></g></svg>`)}`; }
+function demoSvg() {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"><rect width="800" height="500" fill="#fbfaf5"/><g stroke="#172a35" stroke-width="7" fill="none"><path d="M80 70H720V430H80Z"/><path d="M480 70V430M80 270H480"/></g><g fill="#4d6570" font-family="sans-serif" font-size="24"><text x="180" y="180">ESTAR-COMEDOR</text><text x="570" y="180">DORMITORIO</text><text x="190" y="365">5,00 m</text><text x="550" y="365">3,00 m</text></g><g stroke="#e56d3b" stroke-width="4"><path d="M240 70v-25M240 45h240M480 45v25"/><path d="M510 270v-25M510 245h160M670 245v25"/></g></svg>`)}`;
+}
 
 export default function Home() {
-  const [project, setProject] = useState<PlanProject | null>(null); const [projects, setProjects] = useState<PlanProject[]>([]); const [file, setFile] = useState<File | null>(null); const [previewUrl, setPreviewUrl] = useState<string | null>(null); const [selectedPage, setSelectedPage] = useState(1); const [rotation, setRotation] = useState(0); const [cropInset, setCropInset] = useState(0); const [dropActive, setDropActive] = useState(false); const [busy, setBusy] = useState(false); const [visionConfigured, setVisionConfigured] = useState<boolean | null>(null); const [visionError, setVisionError] = useState<string | null>(null); const [message, setMessage] = useState<{ kind: "error" | "success" | "info"; text: string } | null>(null); const [tab, setTab] = useState<"review" | "materials">("review"); const fileInput = useRef<HTMLInputElement>(null);
-  useEffect(() => { fetch("/api/projects").then((response) => response.ok ? response.json() : null).then((data) => { if (data) { setProjects(data.projects ?? []); setVisionConfigured(data.visionConfigured !== false); setVisionError(data.visionError ?? null); } }).catch(() => { setVisionConfigured(null); setVisionError(null); }); }, []);
-  function setSelectedFile(next: File) { if (!["image/jpeg", "image/png", "application/pdf"].includes(next.type)) { setMessage({ kind: "error", text: "Formato no admitido. Elegí JPG, PNG o PDF." }); return; } if (next.size > 15 * 1024 * 1024) { setMessage({ kind: "error", text: "El archivo supera el máximo de 15 MB." }); return; } setProject(null); setFile(next); setRotation(0); setCropInset(0); setMessage(null); setPreviewUrl(next.type === "application/pdf" ? null : next.name === "plano-demo-public-domain.png" ? SAMPLE_PLAN : URL.createObjectURL(next)); }
-  function selectFile(event: ChangeEvent<HTMLInputElement>) { const next = event.target.files?.[0] ?? null; if (next) setSelectedFile(next); }
-  async function loadSampleFile() { await openDemo(); }
+  const [project, setProject] = useState<PlanProject | null>(null);
+  const [projects, setProjects] = useState<PlanProject[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedPage, setSelectedPage] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [cropInset, setCropInset] = useState(0);
+  const [dropActive, setDropActive] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [visionConfigured, setVisionConfigured] = useState<boolean | null>(
+    null,
+  );
+  const [visionError, setVisionError] = useState<string | null>(null);
+  const [message, setMessage] = useState<{
+    kind: "error" | "success" | "info";
+    text: string;
+  } | null>(null);
+  const [tab, setTab] = useState<"review" | "materials">("review");
+  const [showAdvancedReview, setShowAdvancedReview] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    fetch("/api/projects")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data) {
+          setProjects(data.projects ?? []);
+          setVisionConfigured(data.visionConfigured !== false);
+          setVisionError(data.visionError ?? null);
+        }
+      })
+      .catch(() => {
+        setVisionConfigured(null);
+        setVisionError(null);
+      });
+  }, []);
+  function setSelectedFile(next: File) {
+    if (!["image/jpeg", "image/png", "application/pdf"].includes(next.type)) {
+      setMessage({
+        kind: "error",
+        text: "Formato no admitido. Elegí JPG, PNG o PDF.",
+      });
+      return;
+    }
+    if (next.size > 15 * 1024 * 1024) {
+      setMessage({
+        kind: "error",
+        text: "El archivo supera el máximo de 15 MB.",
+      });
+      return;
+    }
+    setProject(null);
+    setFile(next);
+    setRotation(0);
+    setCropInset(0);
+    setMessage(null);
+    setPreviewUrl(
+      next.type === "application/pdf"
+        ? null
+        : next.name === "plano-demo-public-domain.png"
+          ? SAMPLE_PLAN
+          : URL.createObjectURL(next),
+    );
+  }
+  function selectFile(event: ChangeEvent<HTMLInputElement>) {
+    const next = event.target.files?.[0] ?? null;
+    if (next) setSelectedFile(next);
+  }
+  async function loadSampleFile() {
+    await openDemo();
+  }
   // El binding se instala una vez sobre la zona de carga y la tarjeta demo.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { const zone = document.querySelector(".dropzone"); const sample = document.querySelector(".demo-box"); if (!zone || !sample) return; sample.setAttribute("draggable", "true"); const onStart = (event: Event) => { (event as globalThis.DragEvent).dataTransfer?.setData("application/x-computo-sample", "public-domain-sample"); }; const onOver = (event: Event) => { event.preventDefault(); zone.classList.add("drop-active"); }; const onLeave = () => zone.classList.remove("drop-active"); const onDrop = (event: Event) => { event.preventDefault(); zone.classList.remove("drop-active"); void loadSampleFile(); }; sample.addEventListener("dragstart", onStart); zone.addEventListener("dragover", onOver); zone.addEventListener("dragleave", onLeave); zone.addEventListener("drop", onDrop); return () => { sample.removeEventListener("dragstart", onStart); zone.removeEventListener("dragover", onOver); zone.removeEventListener("dragleave", onLeave); zone.removeEventListener("drop", onDrop); }; }, []);
-  function dropFile(event: DragEvent<HTMLDivElement>) { event.preventDefault(); setDropActive(false); if (event.dataTransfer.getData("application/x-computo-sample")) { void loadSampleFile(); return; } const next = event.dataTransfer.files?.[0]; if (next) setSelectedFile(next); }
-  async function upload(event: FormEvent) { event.preventDefault(); const submitter = (event.nativeEvent as SubmitEvent).submitter; if (submitter instanceof HTMLElement && submitter.classList.contains("tool-button")) return; if (!file) return; if (visionConfigured === false) { setMessage({ kind: "error", text: visionError || "La visión no está configurada en Vercel." }); return; } setBusy(true); setMessage({ kind: "info", text: "Enviando el plano al proveedor de IA y validando su respuesta…" }); try { const prepared = await prepareImage(file, rotation, cropInset); const form = new FormData(); form.append("file", prepared); if (file.type === "application/pdf") form.append("selectedPage", String(selectedPage)); const response = await fetch("/api/projects", { method: "POST", body: form }); const data = await response.json(); if (!response.ok) throw new Error(data.error || "No se pudo analizar el archivo."); setProject(data.project); setProjects((current) => [data.project, ...current.filter((item) => item.id !== data.project.id)]); setMessage({ kind: "success", text: "Interpretación recibida. Revisá los datos pendientes antes de calcular." }); setTab("review"); } catch (error) { setMessage({ kind: "error", text: error instanceof Error ? error.message : "No se pudo analizar el archivo." }); } finally { setBusy(false); } }
-  async function openDemo() { setBusy(true); setMessage(null); try { const response = await fetch("/api/projects/demo", { method: "POST" }); const data = await response.json(); setProject(data.project); setProjects((current) => [data.project, ...current.filter((item) => item.id !== data.project.id)]); setPreviewUrl(SAMPLE_PLAN); setTab("review"); setMessage({ kind: "info", text: "EJEMPLO DEMO · Plano público de muestra con datos conocidos y rotulados. No se analizó un archivo nuevo." }); } catch { setMessage({ kind: "error", text: "No se pudo abrir el ejemplo demo." }); } finally { setBusy(false); } }
-  function updateInterpretation(updater: (draft: PlanInterpretation) => void) { if (!project) return; const interpretation = clone(project.interpretation); updater(interpretation); setProject({ ...project, interpretation, calculation: null, updatedAt: new Date().toISOString() }); }
-  function updateRoom(index: number, field: keyof Room, value: string | number | null) { updateInterpretation((draft) => { (draft.rooms[index] as any)[field] = value === "" ? null : field === "name" || field === "state" || field === "evidenceId" ? value : Number(value); if (field === "widthM" || field === "lengthM") draft.rooms[index].areaM2 = null; }); }
-  function updateWall(index: number, field: keyof Wall, value: string | number | boolean | null) { updateInterpretation((draft) => { (draft.walls[index] as any)[field] = value === "" ? null : field === "label" || field === "state" || field === "evidenceId" ? value : field === "lengthM" || field === "heightM" || field === "thicknessM" ? Number(value) : value; }); }
-  function updateSetting(field: keyof PlanInterpretation["settings"], value: string) { updateInterpretation((draft) => { (draft.settings as any)[field] = value === "" ? null : field.endsWith("Material") ? value : Number(value); }); }
-  async function recalculate() { if (!project) return; setBusy(true); setMessage({ kind: "info", text: "Validando y recalculando…" }); try { const response = await fetch(`/api/projects/${project.id}/calculate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project, interpretation: project.interpretation }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error); setProject(data.project); setProjects((current) => current.map((item) => item.id === data.project.id ? data.project : item)); setTab("materials"); setMessage({ kind: "success", text: "Cómputo recalculado y guardado localmente." }); } catch (error) { setMessage({ kind: "error", text: error instanceof Error ? error.message : "No se pudo recalcular." }); } finally { setBusy(false); } }
-  function backup() { if (!project) return; const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${project.name.replace(/\s+/g, "-")}-respaldo.json`; anchor.click(); URL.revokeObjectURL(url); }
-  function exportCsv() { if (!project?.calculation) return; const lines = [["Material", "Cantidad", "Unidad", "Fórmula", "Estado", "Origen"], ...project.calculation.lines.map((line) => [line.material, line.quantity === null ? "pendiente" : String(line.quantity).replace(".", ","), line.unit, line.formula, line.status, line.sourceIds.join(" | ")])]; const csv = lines.map((line) => line.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(";")).join("\n"); const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${project.name.replace(/\s+/g, "-")}-computo.csv`; anchor.click(); URL.revokeObjectURL(url); }
-  const calcPreview = useMemo(() => project ? calculateMaterials(project.interpretation) : null, [project]); const pendingQuestions = project ? [...project.interpretation.questions, ...project.interpretation.unknowns] : [];
-  return <main className="app-shell"><header className="app-header"><div className="header-inner"><div className="brand-mark brand-mark-large">CM</div><div><div className="product-name">CÓMPUTO<span>/</span>PLANO</div><div className="product-subtitle">Lectura asistida para decisiones reales</div></div><div className="header-actions"><span className="privacy-note">🔒 Los planos se envían al proveedor de IA</span><button className="text-button" onClick={backup} disabled={!project}>Descargar respaldo</button></div></div></header><section className="intro"><div><p className="kicker">MVP · VIVIENDAS DE UNA PLANTA</p><h1>Del plano al cómputo,<br /><em>sin perder el criterio.</em></h1><p className="lead">Subí una imagen legible. La IA propone una lectura y vos confirmás únicamente lo que falta.</p></div><div className="trust-stamp"><span>01</span><strong>Primero evidencia</strong><small>Las cotas explícitas mandan.<br />La IA no mide por píxeles.</small></div></section><div className="workflow"><div className="workflow-step active"><span>01</span><div><strong>Plano</strong><small>Cargar y revisar</small></div></div><div className="workflow-line" /><div className={`workflow-step ${project ? "active" : ""}`}><span>02</span><div><strong>Interpretación</strong><small>Confirmar pendientes</small></div></div><div className="workflow-line" /><div className={`workflow-step ${project?.calculation ? "active" : ""}`}><span>03</span><div><strong>Cómputo</strong><small>Fórmulas y exportación</small></div></div></div>{message && <div className={`banner banner-${message.kind}`}>{message.kind === "error" ? "!" : message.kind === "success" ? "✓" : "i"}<span>{message.text}</span></div>}<section className="workspace"><aside className="upload-panel panel"><div className="section-label">A · ENTRADA</div><h2>Empezá por el plano</h2><p className="muted">JPG, PNG o una página de PDF. Máximo 15 MB.</p><form onSubmit={upload}><div className={`dropzone ${file ? "has-file" : ""}`} onClick={() => fileInput.current?.click()}><input ref={fileInput} type="file" accept="image/jpeg,image/png,application/pdf" onChange={selectFile} hidden />{file ? <><div className="file-symbol">{file.type === "application/pdf" ? "PDF" : "IMG"}</div><strong>{file.name}</strong><small>{(file.size / 1024 / 1024).toFixed(2)} MB · listo para preparar</small></> : <><div className="upload-icon">↑</div><strong>Soltá el plano acá</strong><small>o elegí un archivo de tu equipo</small></>}</div>{file?.type === "application/pdf" && <label className="field"><span>Página a interpretar</span><input type="number" min="1" max="100" value={selectedPage} onChange={(event) => setSelectedPage(Number(event.target.value))} /></label>}{file && file.type !== "application/pdf" && <div className="image-tools"><button type="button" className="tool-button" onClick={() => setRotation((value) => (value + 90) % 360)}>↻ Rotar</button><button type="button" className={`tool-button ${cropInset ? "selected" : ""}`} onClick={() => setCropInset((value) => value ? 0 : 0.06)}>⌗ {cropInset ? "Quitar recorte" : "Recortar bordes"}</button></div>}<button className="primary-button full" disabled={!file || busy}>{busy ? "Procesando…" : "Interpretar plano →"}</button></form><div className="privacy-box"><span>⌁</span><p><strong>Privacidad clara</strong><br />El archivo viaja al proveedor configurado para visión. Se guarda localmente en este equipo junto con el proyecto.</p></div><div className="demo-box"><div><span className="demo-tag">DEMO</span><strong>¿Querés probar sin API key?</strong></div><p>Ejemplo conocido con resultados verificables. No simula analizar un archivo nuevo.</p><button type="button" className="secondary-button full" onClick={openDemo} disabled={busy}>Abrir ejemplo demo ↗</button></div></aside><section className="plan-panel panel"><div className="panel-top"><div><div className="section-label">B · LIENZO</div><h2>{project ? project.name : "Vista del plano"}</h2></div>{project && <span className={`mode-badge ${project.isDemo ? "demo" : "real"}`}>{project.isDemo ? "EJEMPLO DEMO" : "LECTURA REAL"}</span>}</div><div className="plan-canvas">{previewUrl && !project?.isDemo ? <div className="image-preview" style={{ transform: `rotate(${rotation}deg)`, clipPath: cropInset ? "inset(6%)" : undefined }}><img src={previewUrl} alt="Vista previa del plano cargado" /></div> : project ? <><img className="demo-plan-image" src={previewUrl || demoSvg()} alt="Esquema del plano demo" /><div className="evidence-layer">{project.interpretation.evidence.map((evidence) => evidence.region && <span key={evidence.id} className="evidence-pin" style={{ left: `${evidence.region.x * 100}%`, top: `${evidence.region.y * 100}%`, width: `${evidence.region.width * 100}%`, height: `${evidence.region.height * 100}%` }} title={evidence.description} />)}</div></> : <div className="empty-canvas"><div className="empty-grid" /><div className="empty-copy"><span>⌁</span><strong>Tu plano aparece acá</strong><p>La lectura visual y sus evidencias se muestran sobre este lienzo.</p></div></div>}</div>{project && <div className="legend"><span><i className="legend-cota" />Cotas / evidencia</span><span><i className="legend-detectado" />Propuesta IA</span><span><i className="legend-pending" />Dato pendiente</span></div>}</section><aside className="review-panel panel"><div className="panel-top"><div><div className="section-label">C · REVISIÓN</div><h2>{project ? "Lo que sabemos" : "Esperando un plano"}</h2></div>{project && <span className="counter-badge">{pendingQuestions.length} pendientes</span>}</div>{project ? <><div className="status-overview"><div><span className="status-dot green" /><strong>Lectura recibida</strong><small>{moneyDate(project.updatedAt)}</small></div><div><span className="status-dot amber" /><strong>{project.interpretation.rooms.length} ambientes · {project.interpretation.walls.length} muros</strong><small>Los muros se cuentan una vez</small></div></div>{pendingQuestions.length > 0 && <div className="questions"><div className="questions-head"><strong>Necesitamos tu criterio</strong><span>{pendingQuestions.length}</span></div>{pendingQuestions.slice(0, 4).map((question, index) => <div className="question" key={`${question}-${index}`}><span>?</span><p>{question}</p></div>)}</div>}<div className="review-list"><div className="review-row"><span className="state-chip status-confirmed">✓</span><div><strong>Orientación</strong><small>{project.interpretation.orientation}</small></div></div><div className="review-row"><span className="state-chip status-detected">◌</span><div><strong>Perspectiva</strong><small>{project.interpretation.perspective}</small></div></div><div className="review-row"><span className="state-chip status-detected">◌</span><div><strong>Evidencia visual</strong><small>{project.interpretation.evidence.length} referencias sobre el plano</small></div></div></div></> : <div className="awaiting"><span>01</span><p>Elegí un archivo para empezar, o abrí el ejemplo demo.</p></div>}</aside></section>{project && <section className="detail-section"><div className="detail-header"><div><p className="kicker">D · DATOS Y RESULTADO</p><h2>Revisar antes de comprar</h2><p className="muted">Editá sólo lo que conocés. Los campos ausentes quedan pendientes; nunca se interpretan como cero.</p></div><div className="tab-bar"><button className={tab === "review" ? "active" : ""} onClick={() => setTab("review")}>Interpretación <span>{project.interpretation.rooms.length + project.interpretation.walls.length}</span></button><button className={tab === "materials" ? "active" : ""} onClick={() => setTab("materials")}>Cómputo {project.calculation && <span>✓</span>}</button></div></div>{tab === "review" ? <ReviewEditor project={project} updateRoom={updateRoom} updateWall={updateWall} updateInterpretation={updateInterpretation} updateSetting={updateSetting} /> : <MaterialsView project={project} calcPreview={calcPreview} exportCsv={exportCsv} />}{tab === "review" && <div className="calculate-bar"><div><strong>¿Todo revisado?</strong><small>El motor de cálculo independiente usará sólo datos válidos.</small></div><button className="primary-button" onClick={recalculate} disabled={busy}>{busy ? "Guardando…" : "Calcular materiales →"}</button></div>}</section>}{projects.length > 0 && <section className="recent"><div><p className="kicker">ARCHIVO LOCAL</p><h2>Proyectos recientes</h2></div><div className="recent-list">{projects.slice(0, 4).map((item) => <button key={item.id} className={`recent-item ${project?.id === item.id ? "selected" : ""}`} onClick={() => { setProject(item); setPreviewUrl(item.isDemo ? demoSvg() : null); }}>{item.isDemo ? "✦" : "□"}<span><strong>{item.name}</strong><small>{moneyDate(item.updatedAt)}</small></span><b>→</b></button>)}</div></section>}<footer className="app-footer"><span>COMPUTO/PLANO · MVP de exploración</span><span>No es aprobación para obra · No calcula estructura, instalaciones ni precios</span></footer></main>;
+  useEffect(() => {
+    const zone = document.querySelector(".dropzone");
+    const sample = document.querySelector(".demo-box");
+    if (!zone || !sample) return;
+    sample.setAttribute("draggable", "true");
+    const onStart = (event: Event) => {
+      (event as globalThis.DragEvent).dataTransfer?.setData(
+        "application/x-computo-sample",
+        "public-domain-sample",
+      );
+    };
+    const onOver = (event: Event) => {
+      event.preventDefault();
+      zone.classList.add("drop-active");
+    };
+    const onLeave = () => zone.classList.remove("drop-active");
+    const onDrop = (event: Event) => {
+      event.preventDefault();
+      zone.classList.remove("drop-active");
+      void loadSampleFile();
+    };
+    sample.addEventListener("dragstart", onStart);
+    zone.addEventListener("dragover", onOver);
+    zone.addEventListener("dragleave", onLeave);
+    zone.addEventListener("drop", onDrop);
+    return () => {
+      sample.removeEventListener("dragstart", onStart);
+      zone.removeEventListener("dragover", onOver);
+      zone.removeEventListener("dragleave", onLeave);
+      zone.removeEventListener("drop", onDrop);
+    };
+  }, []);
+  function dropFile(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDropActive(false);
+    if (event.dataTransfer.getData("application/x-computo-sample")) {
+      void loadSampleFile();
+      return;
+    }
+    const next = event.dataTransfer.files?.[0];
+    if (next) setSelectedFile(next);
+  }
+  async function upload(event: FormEvent) {
+    event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    if (
+      submitter instanceof HTMLElement &&
+      submitter.classList.contains("tool-button")
+    )
+      return;
+    if (!file) return;
+    if (visionConfigured === false) {
+      setMessage({
+        kind: "error",
+        text: visionError || "La visión no está configurada en Vercel.",
+      });
+      return;
+    }
+    setBusy(true);
+    setMessage({
+      kind: "info",
+      text: "Enviando el plano al proveedor de IA y validando su respuesta…",
+    });
+    try {
+      const prepared = await prepareImage(file, rotation, cropInset);
+      const form = new FormData();
+      form.append("file", prepared);
+      if (file.type === "application/pdf")
+        form.append("selectedPage", String(selectedPage));
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        body: form,
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "No se pudo analizar el archivo.");
+      setProject(data.project);
+      setProjects((current) => [
+        data.project,
+        ...current.filter((item) => item.id !== data.project.id),
+      ]);
+      setMessage({
+        kind: "success",
+        text: "Interpretación recibida. Revisá los datos pendientes antes de calcular.",
+      });
+      setTab("review");
+    } catch (error) {
+      setMessage({
+        kind: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "No se pudo analizar el archivo.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function openDemo() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/projects/demo", { method: "POST" });
+      const data = await response.json();
+      setProject(data.project);
+      setProjects((current) => [
+        data.project,
+        ...current.filter((item) => item.id !== data.project.id),
+      ]);
+      setPreviewUrl(SAMPLE_PLAN);
+      setTab("review");
+      setMessage({
+        kind: "info",
+        text: "EJEMPLO DEMO · Plano público de muestra con datos conocidos y rotulados. No se analizó un archivo nuevo.",
+      });
+    } catch {
+      setMessage({ kind: "error", text: "No se pudo abrir el ejemplo demo." });
+    } finally {
+      setBusy(false);
+    }
+  }
+  function updateInterpretation(updater: (draft: PlanInterpretation) => void) {
+    if (!project) return;
+    const interpretation = clone(project.interpretation);
+    updater(interpretation);
+    setProject({
+      ...project,
+      interpretation,
+      calculation: null,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  function updateRoom(
+    index: number,
+    field: keyof Room,
+    value: string | number | null,
+  ) {
+    updateInterpretation((draft) => {
+      (draft.rooms[index] as any)[field] =
+        value === ""
+          ? null
+          : field === "name" || field === "state" || field === "evidenceId"
+            ? value
+            : Number(value);
+      if (field === "widthM" || field === "lengthM")
+        draft.rooms[index].areaM2 = null;
+    });
+  }
+  function updateWall(
+    index: number,
+    field: keyof Wall,
+    value: string | number | boolean | null,
+  ) {
+    updateInterpretation((draft) => {
+      (draft.walls[index] as any)[field] =
+        value === ""
+          ? null
+          : field === "label" || field === "state" || field === "evidenceId"
+            ? value
+            : field === "lengthM" ||
+                field === "heightM" ||
+                field === "thicknessM"
+              ? Number(value)
+              : value;
+    });
+  }
+  function updateSetting(
+    field: keyof PlanInterpretation["settings"],
+    value: string,
+  ) {
+    updateInterpretation((draft) => {
+      (draft.settings as any)[field] =
+        value === ""
+          ? null
+          : field.endsWith("Material")
+            ? value
+            : Number(value);
+    });
+  }
+  async function recalculate() {
+    if (!project) return;
+    setBusy(true);
+    setMessage({ kind: "info", text: "Validando y recalculando…" });
+    try {
+      const response = await fetch(`/api/projects/${project.id}/calculate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project,
+          interpretation: project.interpretation,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setProject(data.project);
+      setProjects((current) =>
+        current.map((item) =>
+          item.id === data.project.id ? data.project : item,
+        ),
+      );
+      setTab("materials");
+      setMessage({
+        kind: "success",
+        text: "Cómputo recalculado y guardado localmente.",
+      });
+    } catch (error) {
+      setMessage({
+        kind: "error",
+        text: error instanceof Error ? error.message : "No se pudo recalcular.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+  function backup() {
+    if (!project) return;
+    const blob = new Blob([JSON.stringify(project, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${project.name.replace(/\s+/g, "-")}-respaldo.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+  function exportCsv() {
+    if (!project?.calculation) return;
+    const lines = [
+      ["Material", "Cantidad", "Unidad", "Fórmula", "Estado", "Origen"],
+      ...project.calculation.lines.map((line) => [
+        line.material,
+        line.quantity === null
+          ? "pendiente"
+          : String(line.quantity).replace(".", ","),
+        line.unit,
+        line.formula,
+        line.status,
+        line.sourceIds.join(" | "),
+      ]),
+    ];
+    const csv = lines
+      .map((line) =>
+        line.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(";"),
+      )
+      .join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${project.name.replace(/\s+/g, "-")}-computo.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+  const calcPreview = useMemo(
+    () => (project ? calculateMaterials(project.interpretation) : null),
+    [project],
+  );
+  const pendingQuestions = project
+    ? [...project.interpretation.questions, ...project.interpretation.unknowns]
+    : [];
+  return (
+    <main className="app-shell">
+      <header className="app-header">
+        <div className="header-inner">
+          <div className="brand-mark brand-mark-large">CM</div>
+          <div>
+            <div className="product-name">
+              CÓMPUTO<span>/</span>PLANO
+            </div>
+            <div className="product-subtitle">
+              Lectura asistida para decisiones reales
+            </div>
+          </div>
+          <div className="header-actions">
+            <span className="privacy-note">
+              🔒 Los planos se envían al proveedor de IA
+            </span>
+            <button
+              className="text-button"
+              onClick={backup}
+              disabled={!project}
+            >
+              Descargar respaldo
+            </button>
+          </div>
+        </div>
+      </header>
+      <section className="intro">
+        <div>
+          <p className="kicker">MVP · VIVIENDAS DE UNA PLANTA</p>
+          <h1>
+            Del plano al cómputo,
+            <br />
+            <em>sin perder el criterio.</em>
+          </h1>
+          <p className="lead">
+            Subí una imagen legible. La IA propone una lectura y vos confirmás
+            únicamente lo que falta.
+          </p>
+        </div>
+        <div className="trust-stamp">
+          <span>01</span>
+          <strong>Primero evidencia</strong>
+          <small>
+            Las cotas explícitas mandan.
+            <br />
+            La IA no mide por píxeles.
+          </small>
+        </div>
+      </section>
+      <div className="workflow">
+        <div className="workflow-step active">
+          <span>01</span>
+          <div>
+            <strong>Plano</strong>
+            <small>Cargar y revisar</small>
+          </div>
+        </div>
+        <div className="workflow-line" />
+        <div className={`workflow-step ${project ? "active" : ""}`}>
+          <span>02</span>
+          <div>
+            <strong>Interpretación</strong>
+            <small>Confirmar pendientes</small>
+          </div>
+        </div>
+        <div className="workflow-line" />
+        <div
+          className={`workflow-step ${project?.calculation ? "active" : ""}`}
+        >
+          <span>03</span>
+          <div>
+            <strong>Cómputo</strong>
+            <small>Fórmulas y exportación</small>
+          </div>
+        </div>
+      </div>
+      {message && (
+        <div className={`banner banner-${message.kind}`}>
+          {message.kind === "error"
+            ? "!"
+            : message.kind === "success"
+              ? "✓"
+              : "i"}
+          <span>{message.text}</span>
+        </div>
+      )}
+      <section className="workspace">
+        <aside className="upload-panel panel">
+          <div className="section-label">A · ENTRADA</div>
+          <h2>Empezá por el plano</h2>
+          <p className="muted">JPG, PNG o una página de PDF. Máximo 15 MB.</p>
+          <form onSubmit={upload}>
+            <div
+              className={`dropzone ${file ? "has-file" : ""}`}
+              onClick={() => fileInput.current?.click()}
+            >
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/jpeg,image/png,application/pdf"
+                onChange={selectFile}
+                hidden
+              />
+              {file ? (
+                <>
+                  <div className="file-symbol">
+                    {file.type === "application/pdf" ? "PDF" : "IMG"}
+                  </div>
+                  <strong>{file.name}</strong>
+                  <small>
+                    {(file.size / 1024 / 1024).toFixed(2)} MB · listo para
+                    preparar
+                  </small>
+                </>
+              ) : (
+                <>
+                  <div className="upload-icon">↑</div>
+                  <strong>Soltá el plano acá</strong>
+                  <small>o elegí un archivo de tu equipo</small>
+                </>
+              )}
+            </div>
+            {file?.type === "application/pdf" && (
+              <label className="field">
+                <span>Página a interpretar</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={selectedPage}
+                  onChange={(event) =>
+                    setSelectedPage(Number(event.target.value))
+                  }
+                />
+              </label>
+            )}
+            {file && file.type !== "application/pdf" && (
+              <div className="image-tools">
+                <button
+                  type="button"
+                  className="tool-button"
+                  onClick={() => setRotation((value) => (value + 90) % 360)}
+                >
+                  ↻ Rotar
+                </button>
+                <button
+                  type="button"
+                  className={`tool-button ${cropInset ? "selected" : ""}`}
+                  onClick={() => setCropInset((value) => (value ? 0 : 0.06))}
+                >
+                  ⌗ {cropInset ? "Quitar recorte" : "Recortar bordes"}
+                </button>
+              </div>
+            )}
+            <button className="primary-button full" disabled={!file || busy}>
+              {busy ? "Procesando…" : "Interpretar plano →"}
+            </button>
+          </form>
+          <div className="privacy-box">
+            <span>⌁</span>
+            <p>
+              <strong>Privacidad clara</strong>
+              <br />
+              El archivo viaja al proveedor configurado para visión. Se guarda
+              localmente en este equipo junto con el proyecto.
+            </p>
+          </div>
+          <div className="demo-box">
+            <div>
+              <span className="demo-tag">DEMO</span>
+              <strong>¿Querés probar sin API key?</strong>
+            </div>
+            <p>
+              Ejemplo conocido con resultados verificables. No simula analizar
+              un archivo nuevo.
+            </p>
+            <button
+              type="button"
+              className="secondary-button full"
+              onClick={openDemo}
+              disabled={busy}
+            >
+              Abrir ejemplo demo ↗
+            </button>
+          </div>
+        </aside>
+        <section className="plan-panel panel">
+          <div className="panel-top">
+            <div>
+              <div className="section-label">B · LIENZO</div>
+              <h2>{project ? project.name : "Vista del plano"}</h2>
+            </div>
+            {project && (
+              <span
+                className={`mode-badge ${project.isDemo ? "demo" : "real"}`}
+              >
+                {project.isDemo ? "EJEMPLO DEMO" : "LECTURA REAL"}
+              </span>
+            )}
+          </div>
+          <div className="plan-canvas">
+            {previewUrl && !project?.isDemo ? (
+              <div
+                className="image-preview"
+                style={{
+                  transform: `rotate(${rotation}deg)`,
+                  clipPath: cropInset ? "inset(6%)" : undefined,
+                }}
+              >
+                <img src={previewUrl} alt="Vista previa del plano cargado" />
+              </div>
+            ) : project ? (
+              <>
+                <img
+                  className="demo-plan-image"
+                  src={previewUrl || demoSvg()}
+                  alt="Esquema del plano demo"
+                />
+                <div className="evidence-layer">
+                  {project.interpretation.evidence.map(
+                    (evidence) =>
+                      evidence.region && (
+                        <span
+                          key={evidence.id}
+                          className="evidence-pin"
+                          style={{
+                            left: `${evidence.region.x * 100}%`,
+                            top: `${evidence.region.y * 100}%`,
+                            width: `${evidence.region.width * 100}%`,
+                            height: `${evidence.region.height * 100}%`,
+                          }}
+                          title={evidence.description}
+                        />
+                      ),
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="empty-canvas">
+                <div className="empty-grid" />
+                <div className="empty-copy">
+                  <span>⌁</span>
+                  <strong>Tu plano aparece acá</strong>
+                  <p>
+                    La lectura visual y sus evidencias se muestran sobre este
+                    lienzo.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          {project && (
+            <div className="legend">
+              <span>
+                <i className="legend-cota" />
+                Cotas / evidencia
+              </span>
+              <span>
+                <i className="legend-detectado" />
+                Propuesta IA
+              </span>
+              <span>
+                <i className="legend-pending" />
+                Dato pendiente
+              </span>
+            </div>
+          )}
+        </section>
+        <aside className="review-panel panel">
+          <div className="panel-top">
+            <div>
+              <div className="section-label">C · REVISIÓN</div>
+              <h2>{project ? "Lo que sabemos" : "Esperando un plano"}</h2>
+            </div>
+            {project && (
+              <span className="counter-badge">
+                {pendingQuestions.length} pendientes
+              </span>
+            )}
+          </div>
+          {project ? (
+            <>
+              <div className="status-overview">
+                <div>
+                  <span className="status-dot green" />
+                  <strong>Lectura recibida</strong>
+                  <small>{moneyDate(project.updatedAt)}</small>
+                </div>
+                <div>
+                  <span className="status-dot amber" />
+                  <strong>
+                    {project.interpretation.rooms.length} ambientes ·{" "}
+                    {project.interpretation.walls.length} muros
+                  </strong>
+                  <small>Los muros se cuentan una vez</small>
+                </div>
+              </div>
+              {pendingQuestions.length > 0 && (
+                <div className="questions">
+                  <div className="questions-head">
+                    <strong>Necesitamos tu criterio</strong>
+                    <span>{pendingQuestions.length}</span>
+                  </div>
+                  {pendingQuestions.slice(0, 4).map((question, index) => (
+                    <div className="question" key={`${question}-${index}`}>
+                      <span>?</span>
+                      <p>{question}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="review-list">
+                <div className="review-row">
+                  <span className="state-chip status-confirmed">✓</span>
+                  <div>
+                    <strong>Orientación</strong>
+                    <small>{project.interpretation.orientation}</small>
+                  </div>
+                </div>
+                <div className="review-row">
+                  <span className="state-chip status-detected">◌</span>
+                  <div>
+                    <strong>Perspectiva</strong>
+                    <small>{project.interpretation.perspective}</small>
+                  </div>
+                </div>
+                <div className="review-row">
+                  <span className="state-chip status-detected">◌</span>
+                  <div>
+                    <strong>Evidencia visual</strong>
+                    <small>
+                      {project.interpretation.evidence.length} referencias sobre
+                      el plano
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="awaiting">
+              <span>01</span>
+              <p>Elegí un archivo para empezar, o abrí el ejemplo demo.</p>
+            </div>
+          )}
+        </aside>
+      </section>
+      {project && (
+        <section className="detail-section">
+          <div className="detail-header">
+            <div>
+              <p className="kicker">D · DATOS Y RESULTADO</p>
+              <h2>Revisar antes de comprar</h2>
+              <p className="muted">
+                Editá sólo lo que conocés. Los campos ausentes quedan
+                pendientes; nunca se interpretan como cero.
+              </p>
+            </div>
+            <div className="tab-bar">
+              <button
+                className={tab === "review" ? "active" : ""}
+                onClick={() => setTab("review")}
+              >
+                Interpretación{" "}
+                <span>
+                  {project.interpretation.rooms.length +
+                    project.interpretation.walls.length}
+                </span>
+              </button>
+              <button
+                className={tab === "materials" ? "active" : ""}
+                onClick={() => setTab("materials")}
+              >
+                Cómputo {project.calculation && <span>✓</span>}
+              </button>
+            </div>
+          </div>
+          {tab === "review" ? (
+            <ReviewEditor
+              project={project}
+              updateRoom={updateRoom}
+              updateWall={updateWall}
+              updateInterpretation={updateInterpretation}
+              updateSetting={updateSetting}
+              showAdvancedReview={showAdvancedReview}
+              onToggleAdvancedReview={() => setShowAdvancedReview((value) => !value)}
+            />
+          ) : (
+            <MaterialsView
+              project={project}
+              calcPreview={calcPreview}
+              exportCsv={exportCsv}
+            />
+          )}
+          {tab === "review" && (
+            <div className="calculate-bar">
+              <div>
+                <strong>¿Todo revisado?</strong>
+                <small>
+                  El motor de cálculo independiente usará sólo datos válidos.
+                </small>
+              </div>
+              <button
+                className="primary-button"
+                onClick={recalculate}
+                disabled={busy}
+              >
+                {busy ? "Guardando…" : "Calcular materiales →"}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+      {projects.length > 0 && (
+        <section className="recent">
+          <div>
+            <p className="kicker">ARCHIVO LOCAL</p>
+            <h2>Proyectos recientes</h2>
+          </div>
+          <div className="recent-list">
+            {projects.slice(0, 4).map((item) => (
+              <button
+                key={item.id}
+                className={`recent-item ${project?.id === item.id ? "selected" : ""}`}
+                onClick={() => {
+                  setProject(item);
+                  setPreviewUrl(item.isDemo ? demoSvg() : null);
+                }}
+              >
+                {item.isDemo ? "✦" : "□"}
+                <span>
+                  <strong>{item.name}</strong>
+                  <small>{moneyDate(item.updatedAt)}</small>
+                </span>
+                <b>→</b>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      <footer className="app-footer">
+        <span>COMPUTO/PLANO · MVP de exploración</span>
+        <span>
+          No es aprobación para obra · No calcula estructura, instalaciones ni
+          precios
+        </span>
+      </footer>
+    </main>
+  );
 }
 
-function ReviewEditor({ project, updateRoom, updateWall, updateInterpretation, updateSetting }: { project: PlanProject; updateRoom: (index: number, field: keyof Room, value: string | number | null) => void; updateWall: (index: number, field: keyof Wall, value: string | number | boolean | null) => void; updateInterpretation: (updater: (draft: PlanInterpretation) => void) => void; updateSetting: (field: keyof PlanInterpretation["settings"], value: string) => void }) {
-  return <div className="editor-grid"><div className="editor-column"><div className="editor-card"><div className="editor-card-head"><div><span className="mini-label">AMBIENTES</span><h3>Superficies de piso</h3></div><button className="small-button" onClick={() => updateInterpretation((draft) => draft.rooms.push({ id: `room-${Date.now()}`, name: "Nuevo ambiente", widthM: null, lengthM: null, areaM2: null, state: "pendiente", evidenceId: null }))}>+ Agregar</button></div>{project.interpretation.rooms.map((room, index) => <div className="data-row" key={room.id}><div className="row-index">{String(index + 1).padStart(2, "0")}</div><div className="row-fields"><div className="inline-field wide"><label>Nombre</label><input value={room.name} onChange={(event) => updateRoom(index, "name", event.target.value)} /></div><div className="inline-field"><label>Ancho <small>m</small></label><input type="number" step="0.01" value={room.widthM ?? ""} placeholder="—" onChange={(event) => updateRoom(index, "widthM", event.target.value)} /></div><div className="inline-field"><label>Largo <small>m</small></label><input type="number" step="0.01" value={room.lengthM ?? ""} placeholder="—" onChange={(event) => updateRoom(index, "lengthM", event.target.value)} /></div><span className={`state-tag ${statusClass[room.state]}`}>{statusLabel[room.state]}</span></div></div>)}</div><div className="editor-card"><div className="editor-card-head"><div><span className="mini-label">MUROS Y ABERTURAS</span><h3>Superficies verticales</h3></div><button className="small-button" onClick={() => updateInterpretation((draft) => draft.walls.push({ id: `wall-${Date.now()}`, label: "Nuevo muro", lengthM: null, heightM: null, thicknessM: null, paintLeft: true, paintRight: true, state: "pendiente", evidenceId: null, openings: [] }))}>+ Agregar</button></div>{project.interpretation.walls.map((wall, index) => <div className="wall-card" key={wall.id}><div className="data-row"><div className="row-index">{String(index + 1).padStart(2, "0")}</div><div className="row-fields"><div className="inline-field wide"><label>Identificación</label><input value={wall.label} onChange={(event) => updateWall(index, "label", event.target.value)} /></div><div className="inline-field"><label>Largo <small>m</small></label><input type="number" step="0.01" value={wall.lengthM ?? ""} placeholder="—" onChange={(event) => updateWall(index, "lengthM", event.target.value)} /></div><div className="inline-field"><label>Alto <small>m</small></label><input type="number" step="0.01" value={wall.heightM ?? ""} placeholder="usar global" onChange={(event) => updateWall(index, "heightM", event.target.value)} /></div><span className={`state-tag ${statusClass[wall.state]}`}>{statusLabel[wall.state]}</span></div></div><div className="wall-options"><label className="check"><input type="checkbox" checked={wall.paintLeft} onChange={(event) => updateWall(index, "paintLeft", event.target.checked)} /> Pintar cara izquierda</label><label className="check"><input type="checkbox" checked={wall.paintRight} onChange={(event) => updateWall(index, "paintRight", event.target.checked)} /> Pintar cara derecha</label><span className="opening-note">{wall.openings.length ? `${wall.openings.length} abertura${wall.openings.length === 1 ? "" : "s"} · se descuentan` : "Sin aberturas detectadas"}</span></div>{wall.openings.map((opening) => <div className="opening-row" key={opening.id}><span>↳ {opening.type}</span><label>Ancho <input type="number" step="0.01" value={opening.widthM ?? ""} placeholder="—" onChange={(event) => updateInterpretation((draft) => { const value = event.target.value === "" ? null : Number(event.target.value); const target = draft.walls[index].openings.find((item) => item.id === opening.id); if (target) target.widthM = value; })} /></label><label>Alto <input type="number" step="0.01" value={opening.heightM ?? ""} placeholder="—" onChange={(event) => updateInterpretation((draft) => { const value = event.target.value === "" ? null : Number(event.target.value); const target = draft.walls[index].openings.find((item) => item.id === opening.id); if (target) target.heightM = value; })} /></label><span className={`state-tag ${statusClass[opening.state]}`}>{statusLabel[opening.state]}</span></div>)}</div>)}</div></div><div className="editor-column"><div className="editor-card assumptions-card"><span className="mini-label">PREGUNTAS QUE CAMBIAN EL RESULTADO</span><h3>Alturas, rendimientos y desperdicio</h3><p className="muted">Los valores de ejemplo están marcados como supuestos. Reemplazalos por la ficha técnica o criterio de obra.</p><div className="settings-grid"><EditNumber label="Altura global de muro" value={project.interpretation.settings.wallHeightM} unit="m" onChange={(value) => updateSetting("wallHeightM", value)} state="supuesto" /><EditNumber label="Desperdicio pisos" value={project.interpretation.settings.floorWastePercent} unit="%" onChange={(value) => updateSetting("floorWastePercent", value)} state="supuesto" /><EditNumber label="Desperdicio ladrillo" value={project.interpretation.settings.brickWastePercent} unit="%" onChange={(value) => updateSetting("brickWastePercent", value)} state="supuesto" /><EditNumber label="Desperdicio pintura" value={project.interpretation.settings.paintWastePercent} unit="%" onChange={(value) => updateSetting("paintWastePercent", value)} state="supuesto" /><EditNumber label="Rendimiento caja cerámico" value={project.interpretation.settings.floorCoverageM2PerBox} unit="m²/caja" onChange={(value) => updateSetting("floorCoverageM2PerBox", value)} state="supuesto" /><EditNumber label="Ladrillos por m²" value={project.interpretation.settings.bricksPerM2} unit="unid/m²" onChange={(value) => updateSetting("bricksPerM2", value)} state="supuesto" /><EditNumber label="Rendimiento pintura" value={project.interpretation.settings.paintCoverageM2PerL} unit="m²/L" onChange={(value) => updateSetting("paintCoverageM2PerL", value)} state="supuesto" /><EditNumber label="Manos" value={project.interpretation.settings.paintCoats} unit="capas" onChange={(value) => updateSetting("paintCoats", value)} state="supuesto" /></div></div><div className="editor-card provenance-card"><span className="mini-label">TRAZABILIDAD</span><h3>Qué significan los estados</h3><div className="state-explainer"><p><span className="state-tag status-confirmed">Confirmado</span> lo validaste o tiene cota explícita.</p><p><span className="state-tag status-detected">Detectado</span> propuesta de IA con evidencia visual.</p><p><span className="state-tag status-assumed">Supuesto</span> valor de ejemplo, editable y no medido.</p><p><span className="state-tag status-pending">Pendiente</span> falta información; no equivale a cero.</p></div></div></div></div>;
+function ReviewEditor({
+  project,
+  updateRoom,
+  updateWall,
+  updateInterpretation,
+  updateSetting,
+  showAdvancedReview,
+  onToggleAdvancedReview,
+}: {
+  project: PlanProject;
+  updateRoom: (
+    index: number,
+    field: keyof Room,
+    value: string | number | null,
+  ) => void;
+  updateWall: (
+    index: number,
+    field: keyof Wall,
+    value: string | number | boolean | null,
+  ) => void;
+  updateInterpretation: (updater: (draft: PlanInterpretation) => void) => void;
+  updateSetting: (
+    field: keyof PlanInterpretation["settings"],
+    value: string,
+  ) => void;
+  showAdvancedReview: boolean;
+  onToggleAdvancedReview: () => void;
+}) {
+  return (
+    <div className="editor-grid">
+      <div className="quick-review-card">
+        <div>
+          <span className="mini-label">REVISIÓN RÁPIDA</span>
+          <h3>Confirmá sólo lo que cambia el resultado</h3>
+          <p className="muted">
+            La IA encontró {project.interpretation.rooms.length} ambiente
+            {project.interpretation.rooms.length === 1 ? "" : "s"}, {project.interpretation.walls.length} muros y {project.interpretation.walls.reduce((total, wall) => total + wall.openings.length, 0)} aberturas.
+          </p>
+        </div>
+        <div className="quick-review-fields">
+          <EditNumber
+            label="Altura global de muro"
+            value={project.interpretation.settings.wallHeightM}
+            unit="m"
+            onChange={(value) => updateSetting("wallHeightM", value)}
+            state="supuesto"
+          />
+          <button
+            type="button"
+            className="small-button"
+            onClick={onToggleAdvancedReview}
+          >
+            {showAdvancedReview ? "Ocultar detalles" : "Revisar muros y rendimientos"}
+          </button>
+        </div>
+      </div>
+      {showAdvancedReview && (
+        <>
+          <div className="editor-column">
+        <div className="editor-card">
+          <div className="editor-card-head">
+            <div>
+              <span className="mini-label">AMBIENTES</span>
+              <h3>Superficies de piso</h3>
+            </div>
+            <button
+              className="small-button"
+              onClick={() =>
+                updateInterpretation((draft) =>
+                  draft.rooms.push({
+                    id: `room-${Date.now()}`,
+                    name: "Nuevo ambiente",
+                    widthM: null,
+                    lengthM: null,
+                    areaM2: null,
+                    state: "pendiente",
+                    evidenceId: null,
+                  }),
+                )
+              }
+            >
+              + Agregar
+            </button>
+          </div>
+          {project.interpretation.rooms.map((room, index) => (
+            <div className="data-row" key={room.id}>
+              <div className="row-index">
+                {String(index + 1).padStart(2, "0")}
+              </div>
+              <div className="row-fields">
+                <div className="inline-field wide">
+                  <label>Nombre</label>
+                  <input
+                    value={room.name}
+                    onChange={(event) =>
+                      updateRoom(index, "name", event.target.value)
+                    }
+                  />
+                </div>
+                <div className="inline-field">
+                  <label>
+                    Ancho <small>m</small>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={room.widthM ?? ""}
+                    placeholder="—"
+                    onChange={(event) =>
+                      updateRoom(index, "widthM", event.target.value)
+                    }
+                  />
+                </div>
+                <div className="inline-field">
+                  <label>
+                    Largo <small>m</small>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={room.lengthM ?? ""}
+                    placeholder="—"
+                    onChange={(event) =>
+                      updateRoom(index, "lengthM", event.target.value)
+                    }
+                  />
+                </div>
+                <span className={`state-tag ${statusClass[room.state]}`}>
+                  {statusLabel[room.state]}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="editor-card">
+          <div className="editor-card-head">
+            <div>
+              <span className="mini-label">MUROS Y ABERTURAS</span>
+              <h3>Superficies verticales</h3>
+            </div>
+            <button
+              className="small-button"
+              onClick={() =>
+                updateInterpretation((draft) =>
+                  draft.walls.push({
+                    id: `wall-${Date.now()}`,
+                    label: "Nuevo muro",
+                    lengthM: null,
+                    heightM: null,
+                    thicknessM: null,
+                    paintLeft: true,
+                    paintRight: true,
+                    state: "pendiente",
+                    evidenceId: null,
+                    openings: [],
+                  }),
+                )
+              }
+            >
+              + Agregar
+            </button>
+          </div>
+          {project.interpretation.walls.map((wall, index) => (
+            <div className="wall-card" key={wall.id}>
+              <div className="data-row">
+                <div className="row-index">
+                  {String(index + 1).padStart(2, "0")}
+                </div>
+                <div className="row-fields">
+                  <div className="inline-field wide">
+                    <label>Identificación</label>
+                    <input
+                      value={wall.label}
+                      onChange={(event) =>
+                        updateWall(index, "label", event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="inline-field">
+                    <label>
+                      Largo <small>m</small>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={wall.lengthM ?? ""}
+                      placeholder="—"
+                      onChange={(event) =>
+                        updateWall(index, "lengthM", event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="inline-field">
+                    <label>
+                      Alto <small>m</small>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={wall.heightM ?? ""}
+                      placeholder="usar global"
+                      onChange={(event) =>
+                        updateWall(index, "heightM", event.target.value)
+                      }
+                    />
+                  </div>
+                  <span className={`state-tag ${statusClass[wall.state]}`}>
+                    {statusLabel[wall.state]}
+                  </span>
+                </div>
+              </div>
+              <div className="wall-options">
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={wall.paintLeft}
+                    onChange={(event) =>
+                      updateWall(index, "paintLeft", event.target.checked)
+                    }
+                  />{" "}
+                  Pintar cara izquierda
+                </label>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={wall.paintRight}
+                    onChange={(event) =>
+                      updateWall(index, "paintRight", event.target.checked)
+                    }
+                  />{" "}
+                  Pintar cara derecha
+                </label>
+                <span className="opening-note">
+                  {wall.openings.length
+                    ? `${wall.openings.length} abertura${wall.openings.length === 1 ? "" : "s"} · se descuentan`
+                    : "Sin aberturas detectadas"}
+                </span>
+              </div>
+              {wall.openings.map((opening) => (
+                <div className="opening-row" key={opening.id}>
+                  <span>↳ {opening.type}</span>
+                  <label>
+                    Ancho{" "}
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={opening.widthM ?? ""}
+                      placeholder="—"
+                      onChange={(event) =>
+                        updateInterpretation((draft) => {
+                          const value =
+                            event.target.value === ""
+                              ? null
+                              : Number(event.target.value);
+                          const target = draft.walls[index].openings.find(
+                            (item) => item.id === opening.id,
+                          );
+                          if (target) target.widthM = value;
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Alto{" "}
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={opening.heightM ?? ""}
+                      placeholder="—"
+                      onChange={(event) =>
+                        updateInterpretation((draft) => {
+                          const value =
+                            event.target.value === ""
+                              ? null
+                              : Number(event.target.value);
+                          const target = draft.walls[index].openings.find(
+                            (item) => item.id === opening.id,
+                          );
+                          if (target) target.heightM = value;
+                        })
+                      }
+                    />
+                  </label>
+                  <span className={`state-tag ${statusClass[opening.state]}`}>
+                    {statusLabel[opening.state]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+          </div>
+          <div className="editor-column">
+        <div className="editor-card assumptions-card">
+          <span className="mini-label">PREGUNTAS QUE CAMBIAN EL RESULTADO</span>
+          <h3>Alturas, rendimientos y desperdicio</h3>
+          <p className="muted">
+            Los valores de ejemplo están marcados como supuestos. Reemplazalos
+            por la ficha técnica o criterio de obra.
+          </p>
+          <div className="settings-grid">
+            <EditNumber
+              label="Altura global de muro"
+              value={project.interpretation.settings.wallHeightM}
+              unit="m"
+              onChange={(value) => updateSetting("wallHeightM", value)}
+              state="supuesto"
+            />
+            <EditNumber
+              label="Desperdicio pisos"
+              value={project.interpretation.settings.floorWastePercent}
+              unit="%"
+              onChange={(value) => updateSetting("floorWastePercent", value)}
+              state="supuesto"
+            />
+            <EditNumber
+              label="Desperdicio ladrillo"
+              value={project.interpretation.settings.brickWastePercent}
+              unit="%"
+              onChange={(value) => updateSetting("brickWastePercent", value)}
+              state="supuesto"
+            />
+            <EditNumber
+              label="Desperdicio pintura"
+              value={project.interpretation.settings.paintWastePercent}
+              unit="%"
+              onChange={(value) => updateSetting("paintWastePercent", value)}
+              state="supuesto"
+            />
+            <EditNumber
+              label="Rendimiento caja cerámico"
+              value={project.interpretation.settings.floorCoverageM2PerBox}
+              unit="m²/caja"
+              onChange={(value) =>
+                updateSetting("floorCoverageM2PerBox", value)
+              }
+              state="supuesto"
+            />
+            <EditNumber
+              label="Ladrillos por m²"
+              value={project.interpretation.settings.bricksPerM2}
+              unit="unid/m²"
+              onChange={(value) => updateSetting("bricksPerM2", value)}
+              state="supuesto"
+            />
+            <EditNumber
+              label="Rendimiento pintura"
+              value={project.interpretation.settings.paintCoverageM2PerL}
+              unit="m²/L"
+              onChange={(value) => updateSetting("paintCoverageM2PerL", value)}
+              state="supuesto"
+            />
+            <EditNumber
+              label="Manos"
+              value={project.interpretation.settings.paintCoats}
+              unit="capas"
+              onChange={(value) => updateSetting("paintCoats", value)}
+              state="supuesto"
+            />
+          </div>
+        </div>
+        <div className="editor-card provenance-card">
+          <span className="mini-label">TRAZABILIDAD</span>
+          <h3>Qué significan los estados</h3>
+          <div className="state-explainer">
+            <p>
+              <span className="state-tag status-confirmed">Confirmado</span> lo
+              validaste o tiene cota explícita.
+            </p>
+            <p>
+              <span className="state-tag status-detected">Detectado</span>{" "}
+              propuesta de IA con evidencia visual.
+            </p>
+            <p>
+              <span className="state-tag status-assumed">Supuesto</span> valor
+              de ejemplo, editable y no medido.
+            </p>
+            <p>
+              <span className="state-tag status-pending">Pendiente</span> falta
+              información; no equivale a cero.
+            </p>
+          </div>
+        </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
-function EditNumber({ label, value, unit, state, onChange }: { label: string; value: number | null; unit: string; state: DataStatus; onChange: (value: string) => void }) { return <label className="setting-field"><span>{label}<small className={`state-tag ${statusClass[state]}`}>{statusLabel[state]}</small></span><div><input type="number" step="0.01" value={value ?? ""} placeholder="pendiente" onChange={(event) => onChange(event.target.value)} /><b>{unit}</b></div></label>; }
-function MaterialsView({ project, calcPreview, exportCsv }: { project: PlanProject; calcPreview: ReturnType<typeof calculateMaterials> | null; exportCsv: () => void }) { const calculation = project.calculation ?? calcPreview; if (!calculation) return <div className="no-result">Todavía no hay cómputo. Volvé a interpretación y ejecutá el cálculo.</div>; return <div className="materials-view"><div className="result-strip"><div><span>ÁREA DE PISO</span><strong>{decimal(calculation.totals.floorAreaM2)} <small>m²</small></strong></div><div><span>MAMPOSTERÍA NETA</span><strong>{decimal(calculation.totals.masonryAreaM2)} <small>m²</small></strong></div><div><span>PINTURA SELECCIONADA</span><strong>{decimal(calculation.totals.paintAreaM2)} <small>m²</small></strong></div><button className="secondary-button" onClick={exportCsv}>↓ Exportar CSV</button></div><div className="table-wrap"><table><thead><tr><th>Material</th><th>Cantidad</th><th>Fórmula</th><th>Estado</th><th>Origen</th></tr></thead><tbody>{calculation.lines.map((line) => <tr key={line.id}><td><strong>{line.material}</strong><small>{line.assumptions.join(" · ")}</small></td><td className="quantity-cell">{line.quantity === null ? <span className="pending-value">pendiente</span> : <><strong>{decimal(line.quantity)}</strong> <small>{line.unit}</small></>}</td><td className="formula">{line.formula}</td><td><span className={`state-tag ${line.status === "completo" ? "status-confirmed" : line.status === "parcial" ? "status-assumed" : "status-pending"}`}>{line.status}</span></td><td><span className="source-count">{line.sourceIds.length} elementos</span></td></tr>)}</tbody></table></div>{calculation.warnings.length > 0 && <div className="warning-list"><strong>Revisar antes de usar</strong>{calculation.warnings.map((warning) => <p key={warning}>↳ {warning}</p>)}</div>}<div className="result-disclaimer"><span>◎</span><p><strong>Este cómputo es orientativo.</strong> Los rendimientos, manos y desperdicios son editables. No incluye estructura, instalaciones, precios ni aprobación para obra.</p></div></div>; }
+function EditNumber({
+  label,
+  value,
+  unit,
+  state,
+  onChange,
+}: {
+  label: string;
+  value: number | null;
+  unit: string;
+  state: DataStatus;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="setting-field">
+      <span>
+        {label}
+        <small className={`state-tag ${statusClass[state]}`}>
+          {statusLabel[state]}
+        </small>
+      </span>
+      <div>
+        <input
+          type="number"
+          step="0.01"
+          value={value ?? ""}
+          placeholder="pendiente"
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <b>{unit}</b>
+      </div>
+    </label>
+  );
+}
+function MaterialsView({
+  project,
+  calcPreview,
+  exportCsv,
+}: {
+  project: PlanProject;
+  calcPreview: ReturnType<typeof calculateMaterials> | null;
+  exportCsv: () => void;
+}) {
+  const calculation = project.calculation ?? calcPreview;
+  if (!calculation)
+    return (
+      <div className="no-result">
+        Todavía no hay cómputo. Volvé a interpretación y ejecutá el cálculo.
+      </div>
+    );
+  return (
+    <div className="materials-view">
+      <div className="result-strip">
+        <div>
+          <span>ÁREA DE PISO</span>
+          <strong>
+            {decimal(calculation.totals.floorAreaM2)} <small>m²</small>
+          </strong>
+        </div>
+        <div>
+          <span>MAMPOSTERÍA NETA</span>
+          <strong>
+            {decimal(calculation.totals.masonryAreaM2)} <small>m²</small>
+          </strong>
+        </div>
+        <div>
+          <span>PINTURA SELECCIONADA</span>
+          <strong>
+            {decimal(calculation.totals.paintAreaM2)} <small>m²</small>
+          </strong>
+        </div>
+        <button className="secondary-button" onClick={exportCsv}>
+          ↓ Exportar CSV
+        </button>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Material</th>
+              <th>Cantidad</th>
+              <th>Fórmula</th>
+              <th>Estado</th>
+              <th>Origen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {calculation.lines.map((line) => (
+              <tr key={line.id}>
+                <td>
+                  <strong>{line.material}</strong>
+                  <small>{line.assumptions.join(" · ")}</small>
+                </td>
+                <td className="quantity-cell">
+                  {line.quantity === null ? (
+                    <span className="pending-value">pendiente</span>
+                  ) : (
+                    <>
+                      <strong>{decimal(line.quantity)}</strong>{" "}
+                      <small>{line.unit}</small>
+                    </>
+                  )}
+                </td>
+                <td className="formula">{line.formula}</td>
+                <td>
+                  <span
+                    className={`state-tag ${line.status === "completo" ? "status-confirmed" : line.status === "parcial" ? "status-assumed" : "status-pending"}`}
+                  >
+                    {line.status}
+                  </span>
+                </td>
+                <td>
+                  <span className="source-count">
+                    {line.sourceIds.length} elementos
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {calculation.warnings.length > 0 && (
+        <div className="warning-list">
+          <strong>Revisar antes de usar</strong>
+          {calculation.warnings.map((warning) => (
+            <p key={warning}>↳ {warning}</p>
+          ))}
+        </div>
+      )}
+      <div className="result-disclaimer">
+        <span>◎</span>
+        <p>
+          <strong>Este cómputo es orientativo.</strong> Los rendimientos, manos
+          y desperdicios son editables. No incluye estructura, instalaciones,
+          precios ni aprobación para obra.
+        </p>
+      </div>
+    </div>
+  );
+}
