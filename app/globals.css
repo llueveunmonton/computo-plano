@@ -62,3 +62,8 @@ th { color: #bac4c4; background: #292e30; }
 .demo-box { display: none !important; }
 .awaiting p { font-size: 0; }
 .awaiting p::after { content: "Elegí un archivo para empezar."; font-size: 11px; }
+.banner { font-size: 0; }
+.banner::before { content: "i"; display: grid; place-items: center; flex: 0 0 auto; width: 18px; height: 18px; border-radius: 50%; background: currentColor; color: white; font: 700 11px "DM Mono", monospace; }
+.banner-error::before { content: "!"; }
+.banner-success::before { content: "✓"; }
+.banner > span:first-child { display: block; width: auto; height: auto; border-radius: 0; background: transparent; color: inherit; font: 13px/1.5 "DM Sans", Arial, sans-serif; }
