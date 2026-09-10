@@ -45,8 +45,8 @@ function extractGeminiText(response: any): string | null {
   return text || null;
 }
 
-async function requestJson(endpoint: string, body: unknown, headers: HeadersInit) {
-  const response = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(90_000) });
+async function requestJson(endpoint: string, body: unknown, headers: HeadersInit, timeoutMs = 90_000) {
+  const response = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     throw new Error(`VISION_PROVIDER_${response.status}: ${detail.slice(0, 300)}`);
@@ -77,8 +77,8 @@ async function extractWithGemini(input: VisionInput, apiKey: string): Promise<Pl
   const payload = await requestJson(endpoint, {
     systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTIONS }] },
     contents: [{ role: "user", parts: [{ text: pageNote(input) }, { inlineData: { mimeType: input.mimeType, data: input.bytes.toString("base64") } }] }],
-    generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: geminiJsonSchema },
-  }, { "Content-Type": "application/json" });
+    generationConfig: { temperature: 0, maxOutputTokens: 4096, responseMimeType: "application/json", responseSchema: geminiJsonSchema },
+  }, { "Content-Type": "application/json" }, 180_000);
   return parseInterpretation(extractGeminiText(payload));
 }
 
