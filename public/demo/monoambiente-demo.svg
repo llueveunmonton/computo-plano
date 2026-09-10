@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520">
+  <rect width="800" height="520" fill="#fbfaf5"/>
+  <g stroke="#172a35" stroke-width="8" fill="none">
+    <path d="M110 85H690V435H110Z"/>
+    <path d="M110 85H270M350 85H690"/>
+    <path d="M690 85V185M690 265V435"/>
+  </g>
+  <g stroke="#e56d3b" stroke-width="4" fill="none">
+    <path d="M270 85v-30M350 85v-30M270 55h80"/>
+    <path d="M690 185h30M690 265h30M720 185v80"/>
+  </g>
+  <g fill="#4d6570" font-family="sans-serif" text-anchor="middle">
+    <text x="400" y="245" font-size="30">MONOAMBIENTE</text>
+    <text x="400" y="285" font-size="22">4,00 × 5,00 m</text>
+    <text x="310" y="42" font-size="18">PUERTA 0,90 × 2,10 m</text>
+    <text x="760" y="230" font-size="18" transform="rotate(90 760 230)">VENTANA 1,20 × 1,00 m</text>
+  </g>
+  <g fill="#e56d3b" font-family="monospace" font-size="20" text-anchor="middle">
+    <text x="400" y="480">5,00 m</text>
+    <text x="65" y="270" transform="rotate(-90 65 270)">4,00 m</text>
+  </g>
+</svg>

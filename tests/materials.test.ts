@@ -5,12 +5,12 @@ import { interpretationSchema } from "@/lib/plan-schema";
 describe("motor de cómputo independiente", () => {
   it("calcula pisos, mampostería y pintura con resultados conocidos", () => {
     const result = calculateMaterials(demoInterpretation, new Date("2026-01-01T00:00:00Z"));
-    expect(result.totals.floorAreaM2).toBe(29);
-    expect(result.lines.find((line) => line.id === "floor")?.quantity).toBe(17);
-    expect(result.totals.masonryAreaM2).toBe(18.91);
-    expect(result.lines.find((line) => line.id === "brick")?.quantity).toBe(334);
-    expect(result.totals.paintAreaM2).toBe(37.82);
-    expect(result.lines.find((line) => line.id === "paint")?.quantity).toBe(8.32);
+    expect(result.totals.floorAreaM2).toBe(20);
+    expect(result.lines.find((line) => line.id === "floor")?.quantity).toBe(12);
+    expect(result.totals.masonryAreaM2).toBe(43.71);
+    expect(result.lines.find((line) => line.id === "brick")?.quantity).toBe(772);
+    expect(result.totals.paintAreaM2).toBe(43.71);
+    expect(result.lines.find((line) => line.id === "paint")?.quantity).toBe(9.62);
   });
 
   it("descuenta aberturas de mampostería y de cada cara pintada", () => {
@@ -23,7 +23,7 @@ describe("motor de cómputo independiente", () => {
 
   it("mantiene pendientes los faltantes y no los convierte en cero", () => {
     const input: PlanInterpretation = structuredClone(demoInterpretation);
-    input.rooms[1].widthM = null;
+    input.rooms[0].widthM = null;
     input.walls[1].lengthM = null;
     input.settings.paintCoverageM2PerL = null;
     const result = calculateMaterials(input);
@@ -40,8 +40,15 @@ describe("motor de cómputo independiente", () => {
     const input: PlanInterpretation = structuredClone(demoInterpretation);
     input.settings.floorWastePercent = 0;
     const second = calculateMaterials(input);
-    expect(first.lines.find((line) => line.id === "floor")?.quantity).toBe(17);
-    expect(second.lines.find((line) => line.id === "floor")?.quantity).toBe(15);
+    expect(first.lines.find((line) => line.id === "floor")?.quantity).toBe(12);
+    expect(second.lines.find((line) => line.id === "floor")?.quantity).toBe(11);
+  });
+
+  it("prioriza las cotas para derivar el área del ambiente", () => {
+    const input: PlanInterpretation = structuredClone(demoInterpretation);
+    input.rooms[0].areaM2 = 100;
+    const result = calculateMaterials(input);
+    expect(result.totals.floorAreaM2).toBe(20);
   });
 
   it("no calcula cantidades con rendimientos inválidos", () => {
@@ -58,8 +65,8 @@ describe("motor de cómputo independiente", () => {
     input.walls[0].openings[0].widthM = 10;
     input.walls[0].openings[0].heightM = 10;
     const result = calculateMaterials(input);
-    expect(result.totals.masonryAreaM2).toBe(7.8);
-    expect(result.totals.paintAreaM2).toBe(15.6);
+    expect(result.totals.masonryAreaM2).toBe(32.6);
+    expect(result.totals.paintAreaM2).toBe(32.6);
     expect(result.lines.find((line) => line.id === "brick")?.status).toBe("parcial");
     expect(result.lines.find((line) => line.id === "paint")?.status).toBe("parcial");
     expect(result.warnings.some((warning) => warning.includes("aberturas inválidas"))).toBe(true);
@@ -69,5 +76,12 @@ describe("motor de cómputo independiente", () => {
     const input: PlanInterpretation = structuredClone(demoInterpretation);
     input.settings.floorCoverageM2PerBox = 0;
     expect(() => interpretationSchema.parse(input)).toThrow();
+  });
+
+  it("advierte cuando faltan muros en un ambiente rectangular", () => {
+    const input: PlanInterpretation = structuredClone(demoInterpretation);
+    input.walls = input.walls.slice(0, 3);
+    const result = calculateMaterials(input);
+    expect(result.warnings.some((warning) => warning.includes("perímetro"))).toBe(true);
   });
 });

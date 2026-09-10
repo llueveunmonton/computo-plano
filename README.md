@@ -44,7 +44,7 @@ npm test
 npm run build
 ```
 
-La suite incluye 8 pruebas: fórmulas conocidas, unidades, aberturas, caras de pintura, faltantes, cómputo parcial, validación de entradas y protección de rutas de almacenamiento.
+La suite incluye 13 pruebas: fórmulas conocidas, un monoambiente controlado, aberturas, caras de pintura, faltantes, cómputo parcial, validación de entradas, perímetro, protección de rutas de almacenamiento, contrato del proveedor de visión y diagnóstico de configuración.
 
 ## Limitaciones conocidas
 

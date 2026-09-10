@@ -56,7 +56,7 @@ th { color: #bac4c4; background: #292e30; }
 .banner-success { border-color: #5a8769; }
 .banner-error { border-color: #936157; }
 .dropzone.drop-active { border-color: var(--orange); background: #4a3b37; box-shadow: 0 0 0 3px rgba(238,128,84,.18); }
-.demo-box { position: relative; padding-right: 102px; min-height: 150px; background: linear-gradient(90deg, rgba(53,59,62,.96) 0%, rgba(53,59,62,.82) 64%, rgba(53,59,62,.18) 100%), url('/demo/simple-house-floor-plan.png') right 11px top 11px / 82px 68px no-repeat; cursor: grab; }
+  .demo-box { position: relative; padding-right: 102px; min-height: 150px; background: linear-gradient(90deg, rgba(53,59,62,.96) 0%, rgba(53,59,62,.82) 64%, rgba(53,59,62,.18) 100%), url('/demo/monoambiente-demo.svg') right 11px top 11px / 82px 68px no-repeat; cursor: grab; }
 .demo-box:active { cursor: grabbing; }
 .demo-box::after { content: "ARRASTRÁ"; position: absolute; right: 14px; bottom: 9px; color: var(--orange); font: 500 8px "DM Mono", monospace; letter-spacing: .08em; }
 .demo-box { display: none !important; }

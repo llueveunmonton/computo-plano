@@ -110,8 +110,8 @@ function openingArea(opening: Opening) {
 export function calculateMaterials(input: PlanInterpretation, now = new Date()): CalculationResult {
   const warnings = [...input.unknowns];
   const floorAreas = input.rooms.map((room) => {
-    if (isPositive(room.areaM2)) return room.areaM2;
     if (isPositive(room.widthM) && isPositive(room.lengthM)) return room.widthM * room.lengthM;
+    if (isPositive(room.areaM2)) return room.areaM2;
     return null;
   });
   const floorAreaM2 = floorAreas.every((value) => value !== null) ? round(floorAreas.reduce((sum, value) => sum + (value ?? 0), 0)) : null;
@@ -135,6 +135,11 @@ export function calculateMaterials(input: PlanInterpretation, now = new Date()):
   const masonryAreaM2 = masonryParts.length ? round(masonryParts.reduce<number>((sum, value) => sum + (value ?? 0), 0)) : null;
   if (masonryIncomplete || masonryParts.some((value) => value === null)) warnings.push("Hay muros o aberturas sin dimensiones: mampostería parcial.");
   if (invalidOpeningWalls.size) warnings.push("Hay aberturas inválidas o mayores que el muro: mampostería y pintura parciales.");
+  if (input.rooms.length === 1 && isPositive(input.rooms[0].widthM) && isPositive(input.rooms[0].lengthM)) {
+    const expectedPerimeter = 2 * (input.rooms[0].widthM + input.rooms[0].lengthM);
+    const measuredPerimeter = input.walls.reduce((sum, wall) => sum + (isPositive(wall.lengthM) ? wall.lengthM : 0), 0);
+    if (Math.abs(measuredPerimeter - expectedPerimeter) > 0.05) warnings.push("La suma de longitudes de muros no coincide con el perímetro del ambiente; revisá muros faltantes o duplicados.");
+  }
 
   const paintParts = input.walls.flatMap((wall) => {
     const height = wall.heightM ?? input.settings.wallHeightM;
@@ -206,20 +211,23 @@ export function calculateMaterials(input: PlanInterpretation, now = new Date()):
 export const demoInterpretation: PlanInterpretation = {
   orientation: "válida",
   perspective: "plana",
-  rooms: [
-    { id: "room-estar", name: "Estar-comedor", widthM: 4, lengthM: 5, areaM2: null, state: "confirmado", evidenceId: "ev-cota-1" },
-    { id: "room-dorm", name: "Dormitorio", widthM: 3, lengthM: 3, areaM2: null, state: "confirmado", evidenceId: "ev-cota-2" },
-  ],
+  rooms: [{ id: "room-mono", name: "Monoambiente", widthM: 4, lengthM: 5, areaM2: null, state: "confirmado", evidenceId: "ev-room" }],
   walls: [
-    { id: "wall-exterior-1", label: "Muro exterior norte", lengthM: 5, heightM: null, thicknessM: 0.15, paintLeft: true, paintRight: true, state: "detectado", evidenceId: "ev-muro-1", openings: [{ id: "door-1", type: "puerta", widthM: 0.9, heightM: 2.1, quantity: 1, state: "confirmado", evidenceId: "ev-puerta" }] },
-    { id: "wall-interior-1", label: "Tabique dormitorio", lengthM: 3, heightM: null, thicknessM: 0.12, paintLeft: true, paintRight: true, state: "detectado", evidenceId: "ev-muro-2", openings: [] },
+    { id: "wall-norte", label: "Muro norte", lengthM: 5, heightM: null, thicknessM: 0.15, paintLeft: true, paintRight: false, state: "confirmado", evidenceId: "ev-wall-norte", openings: [{ id: "door-1", type: "puerta", widthM: 0.9, heightM: 2.1, quantity: 1, state: "confirmado", evidenceId: "ev-puerta" }] },
+    { id: "wall-este", label: "Muro este", lengthM: 4, heightM: null, thicknessM: 0.15, paintLeft: true, paintRight: false, state: "confirmado", evidenceId: "ev-wall-este", openings: [{ id: "window-1", type: "ventana", widthM: 1.2, heightM: 1, quantity: 1, state: "confirmado", evidenceId: "ev-ventana" }] },
+    { id: "wall-sur", label: "Muro sur", lengthM: 5, heightM: null, thicknessM: 0.15, paintLeft: true, paintRight: false, state: "confirmado", evidenceId: "ev-wall-sur", openings: [] },
+    { id: "wall-oeste", label: "Muro oeste", lengthM: 4, heightM: null, thicknessM: 0.15, paintLeft: true, paintRight: false, state: "confirmado", evidenceId: "ev-wall-oeste", openings: [] },
   ],
   evidence: [
-    { id: "ev-cota-1", label: "Cota 5,00 m", description: "Cota explícita leída junto al estar.", region: { x: 0.13, y: 0.27, width: 0.34, height: 0.06 } },
-    { id: "ev-cota-2", label: "Cota 3,00 m", description: "Cota explícita leída junto al dormitorio.", region: { x: 0.58, y: 0.55, width: 0.22, height: 0.06 } },
-    { id: "ev-muro-1", label: "Muro recto", description: "Trazo continuo, posición propuesta; no usado como medición por píxel.", region: { x: 0.1, y: 0.19, width: 0.78, height: 0.04 } },
-    { id: "ev-muro-2", label: "Tabique", description: "Muro interior identificado por continuidad del trazo.", region: { x: 0.5, y: 0.2, width: 0.03, height: 0.58 } },
-    { id: "ev-puerta", label: "Abertura 0,90 × 2,10 m", description: "Símbolo de puerta y medida legible.", region: { x: 0.43, y: 0.17, width: 0.09, height: 0.1 } },
+    { id: "ev-room", label: "Ambiente único", description: "Un recinto rectangular rotulado como monoambiente.", region: { x: 0.14, y: 0.16, width: 0.72, height: 0.65 } },
+    { id: "ev-cota-largo", label: "Cota 5,00 m", description: "Cota explícita del lado largo.", region: { x: 0.38, y: 0.88, width: 0.24, height: 0.06 } },
+    { id: "ev-cota-ancho", label: "Cota 4,00 m", description: "Cota explícita del lado corto.", region: { x: 0.04, y: 0.43, width: 0.08, height: 0.16 } },
+    { id: "ev-wall-norte", label: "Muro norte", description: "Límite superior del recinto.", region: { x: 0.14, y: 0.16, width: 0.72, height: 0.02 } },
+    { id: "ev-wall-este", label: "Muro este", description: "Límite derecho del recinto.", region: { x: 0.85, y: 0.16, width: 0.02, height: 0.65 } },
+    { id: "ev-wall-sur", label: "Muro sur", description: "Límite inferior del recinto.", region: { x: 0.14, y: 0.79, width: 0.72, height: 0.02 } },
+    { id: "ev-wall-oeste", label: "Muro oeste", description: "Límite izquierdo del recinto.", region: { x: 0.14, y: 0.16, width: 0.02, height: 0.65 } },
+    { id: "ev-puerta", label: "Puerta 0,90 × 2,10 m", description: "Abertura rotulada en el muro norte.", region: { x: 0.33, y: 0.14, width: 0.1, height: 0.08 } },
+    { id: "ev-ventana", label: "Ventana 1,20 × 1,00 m", description: "Abertura rotulada en el muro este.", region: { x: 0.84, y: 0.34, width: 0.08, height: 0.18 } },
   ],
   unknowns: ["La altura de muro no aparece explícita en el plano; el ejemplo usa 2,60 m como supuesto editable."],
   questions: ["Confirmá altura terminada de muros."],
