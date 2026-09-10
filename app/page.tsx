@@ -150,12 +150,10 @@ export default function Home() {
   async function loadSampleFile() {
     await openDemo();
   }
-  // El binding se instala una vez sobre la zona de carga y la tarjeta demo.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // La tarjeta demo se puede arrastrar como una fuente de ejemplo.
   useEffect(() => {
-    const zone = document.querySelector(".dropzone");
     const sample = document.querySelector(".demo-box");
-    if (!zone || !sample) return;
+    if (!sample) return;
     sample.setAttribute("draggable", "true");
     const onStart = (event: Event) => {
       (event as globalThis.DragEvent).dataTransfer?.setData(
@@ -163,25 +161,9 @@ export default function Home() {
         "public-domain-sample",
       );
     };
-    const onOver = (event: Event) => {
-      event.preventDefault();
-      zone.classList.add("drop-active");
-    };
-    const onLeave = () => zone.classList.remove("drop-active");
-    const onDrop = (event: Event) => {
-      event.preventDefault();
-      zone.classList.remove("drop-active");
-      void loadSampleFile();
-    };
     sample.addEventListener("dragstart", onStart);
-    zone.addEventListener("dragover", onOver);
-    zone.addEventListener("dragleave", onLeave);
-    zone.addEventListener("drop", onDrop);
     return () => {
       sample.removeEventListener("dragstart", onStart);
-      zone.removeEventListener("dragover", onOver);
-      zone.removeEventListener("dragleave", onLeave);
-      zone.removeEventListener("drop", onDrop);
     };
   }, []);
   function dropFile(event: DragEvent<HTMLDivElement>) {
@@ -507,8 +489,14 @@ export default function Home() {
           <p className="muted">JPG, PNG o una página de PDF. Máximo 15 MB.</p>
           <form onSubmit={upload}>
             <div
-              className={`dropzone ${file ? "has-file" : ""}`}
+              className={`dropzone ${file ? "has-file" : ""} ${dropActive ? "drop-active" : ""}`}
               onClick={() => fileInput.current?.click()}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDropActive(true);
+              }}
+              onDragLeave={() => setDropActive(false)}
+              onDrop={dropFile}
             >
               <input
                 ref={fileInput}
@@ -625,7 +613,7 @@ export default function Home() {
               >
                 <img src={previewUrl} alt="Vista previa del plano cargado" />
               </div>
-            ) : project ? (
+            ) : project?.isDemo ? (
               <>
                 <img
                   className="demo-plan-image"
@@ -656,10 +644,13 @@ export default function Home() {
                 <div className="empty-grid" />
                 <div className="empty-copy">
                   <span>⌁</span>
-                  <strong>Tu plano aparece acá</strong>
+                  <strong>
+                    {project ? "Vista previa no disponible" : "Tu plano aparece acá"}
+                  </strong>
                   <p>
-                    La lectura visual y sus evidencias se muestran sobre este
-                    lienzo.
+                    {project
+                      ? "El archivo real fue interpretado; abrí la revisión para ver sus resultados."
+                      : "La lectura visual y sus evidencias se muestran sobre este lienzo."}
                   </p>
                 </div>
               </div>
