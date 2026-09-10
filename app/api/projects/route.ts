@@ -2,30 +2,13 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { extractPlanWithVision, visionIsConfigured } from "@/lib/vision-extraction";
 import { listProjects, saveProject, uploadPath } from "@/lib/plan-storage";
+import { rateLimited } from "@/lib/request-rate-limit";
 import type { PlanProject } from "@/lib/plan";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const accepted = new Set(["image/jpeg", "image/png", "application/pdf"]);
-const attempts = new Map<string, { count: number; resetAt: number }>();
-
-function clientKey(request: Request) {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-}
-
-function rateLimited(request: Request) {
-  const key = clientKey(request);
-  const now = Date.now();
-  const current = attempts.get(key);
-  if (!current || current.resetAt < now) {
-    attempts.set(key, { count: 1, resetAt: now + 60_000 });
-    return false;
-  }
-  current.count += 1;
-  return current.count > 5;
-}
-
 export async function GET() {
   return NextResponse.json({ projects: await listProjects(), visionConfigured: visionIsConfigured() });
 }

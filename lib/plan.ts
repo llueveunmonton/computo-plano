@@ -100,53 +100,67 @@ export type CalculationResult = {
 
 const round = (value: number) => Math.round(value * 100) / 100;
 
+const isPositive = (value: number | null): value is number => value !== null && Number.isFinite(value) && value > 0;
+
 function openingArea(opening: Opening) {
-  if (opening.widthM === null || opening.heightM === null) return null;
+  if (!isPositive(opening.widthM) || !isPositive(opening.heightM) || !Number.isInteger(opening.quantity) || opening.quantity <= 0) return null;
   return opening.widthM * opening.heightM * opening.quantity;
 }
 
 export function calculateMaterials(input: PlanInterpretation, now = new Date()): CalculationResult {
   const warnings = [...input.unknowns];
   const floorAreas = input.rooms.map((room) => {
-    if (room.areaM2 !== null) return room.areaM2;
-    if (room.widthM !== null && room.lengthM !== null) return room.widthM * room.lengthM;
+    if (isPositive(room.areaM2)) return room.areaM2;
+    if (isPositive(room.widthM) && isPositive(room.lengthM)) return room.widthM * room.lengthM;
     return null;
   });
   const floorAreaM2 = floorAreas.every((value) => value !== null) ? round(floorAreas.reduce((sum, value) => sum + (value ?? 0), 0)) : null;
   if (floorAreaM2 === null) warnings.push("Faltan dimensiones de uno o más ambientes para cerrar pisos/cerámicos.");
 
-  const brickWalls = input.walls.filter((wall) => wall.lengthM !== null && (wall.heightM ?? input.settings.wallHeightM) !== null);
+  const invalidOpeningWalls = new Set<string>();
+  const brickWalls = input.walls.filter((wall) => isPositive(wall.lengthM) && isPositive(wall.heightM ?? input.settings.wallHeightM));
   const masonryParts = brickWalls.map((wall) => {
     const height = wall.heightM ?? input.settings.wallHeightM;
-    if (wall.lengthM === null || height === null) return null;
+    if (!isPositive(wall.lengthM) || !isPositive(height)) return null;
     const openings = wall.openings.map(openingArea);
-    if (openings.some((value) => value === null)) return null;
-    return wall.lengthM * height - openings.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+    const grossArea = wall.lengthM * height;
+    const openingTotal = openings.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+    if (openingTotal > grossArea) invalidOpeningWalls.add(wall.id);
+    if (openings.some((value) => value === null) || openingTotal > grossArea) {
+      return null;
+    }
+    return grossArea - openingTotal;
   });
   const masonryIncomplete = brickWalls.length !== input.walls.length;
   const masonryAreaM2 = masonryParts.length ? round(masonryParts.reduce<number>((sum, value) => sum + (value ?? 0), 0)) : null;
   if (masonryIncomplete || masonryParts.some((value) => value === null)) warnings.push("Hay muros o aberturas sin dimensiones: mampostería parcial.");
+  if (invalidOpeningWalls.size) warnings.push("Hay aberturas inválidas o mayores que el muro: mampostería y pintura parciales.");
 
   const paintParts = input.walls.flatMap((wall) => {
     const height = wall.heightM ?? input.settings.wallHeightM;
     const selectedFaces = Number(wall.paintLeft) + Number(wall.paintRight);
-    if (!selectedFaces || wall.lengthM === null || height === null) return [];
+    if (!selectedFaces || !isPositive(wall.lengthM) || !isPositive(height)) return [];
     const openings = wall.openings.map(openingArea);
-    if (openings.some((value) => value === null)) return [null];
-    return [wall.lengthM * height * selectedFaces - openings.reduce<number>((sum, value) => sum + (value ?? 0), 0)];
+    const grossArea = wall.lengthM * height;
+    const openingTotal = openings.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+    if (openingTotal > grossArea) invalidOpeningWalls.add(wall.id);
+    if (openings.some((value) => value === null) || openingTotal > grossArea) {
+      return [null];
+    }
+    return [(grossArea - openingTotal) * selectedFaces];
   });
   const paintAreaM2 = paintParts.length && paintParts.every((value) => value !== null)
     ? round(paintParts.reduce<number>((sum, value) => sum + (value ?? 0), 0))
     : paintParts.length ? round(paintParts.reduce<number>((sum, value) => sum + (value ?? 0), 0)) : null;
   if (paintParts.some((value) => value === null)) warnings.push("Hay aberturas sin dimensiones en caras seleccionadas: pintura parcial.");
 
-  const floorQuantity = floorAreaM2 !== null && input.settings.floorCoverageM2PerBox !== null
+  const floorQuantity = floorAreaM2 !== null && isPositive(input.settings.floorCoverageM2PerBox)
     ? Math.ceil((floorAreaM2 * (1 + input.settings.floorWastePercent / 100)) / input.settings.floorCoverageM2PerBox)
     : null;
-  const brickQuantity = masonryAreaM2 !== null && input.settings.bricksPerM2 !== null
+  const brickQuantity = masonryAreaM2 !== null && isPositive(input.settings.bricksPerM2)
     ? Math.ceil(masonryAreaM2 * input.settings.bricksPerM2 * (1 + input.settings.brickWastePercent / 100))
     : null;
-  const paintQuantity = paintAreaM2 !== null && input.settings.paintCoverageM2PerL !== null && input.settings.paintCoats !== null
+  const paintQuantity = paintAreaM2 !== null && isPositive(input.settings.paintCoverageM2PerL) && isPositive(input.settings.paintCoats)
     ? round((paintAreaM2 * input.settings.paintCoats * (1 + input.settings.paintWastePercent / 100)) / input.settings.paintCoverageM2PerL)
     : null;
 

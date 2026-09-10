@@ -44,7 +44,7 @@ npm test
 npm run build
 ```
 
-La suite incluye 11 pruebas: fórmulas conocidas, unidades, aberturas, caras de pintura, faltantes, cómputo parcial y recalculado de supuestos, además de las pruebas heredadas de integridad de la base anterior.
+La suite incluye 8 pruebas: fórmulas conocidas, unidades, aberturas, caras de pintura, faltantes, cómputo parcial, validación de entradas y protección de rutas de almacenamiento.
 
 ## Limitaciones conocidas
 

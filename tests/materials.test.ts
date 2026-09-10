@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateMaterials, demoInterpretation, type PlanInterpretation } from "@/lib/plan";
+import { interpretationSchema } from "@/lib/plan-schema";
 
 describe("motor de cómputo independiente", () => {
   it("calcula pisos, mampostería y pintura con resultados conocidos", () => {
@@ -8,11 +9,11 @@ describe("motor de cómputo independiente", () => {
     expect(result.lines.find((line) => line.id === "floor")?.quantity).toBe(17);
     expect(result.totals.masonryAreaM2).toBe(18.91);
     expect(result.lines.find((line) => line.id === "brick")?.quantity).toBe(334);
-    expect(result.totals.paintAreaM2).toBe(39.71);
-    expect(result.lines.find((line) => line.id === "paint")?.quantity).toBe(8.74);
+    expect(result.totals.paintAreaM2).toBe(37.82);
+    expect(result.lines.find((line) => line.id === "paint")?.quantity).toBe(8.32);
   });
 
-  it("descuenta cada abertura una vez y respeta caras de pintura", () => {
+  it("descuenta aberturas de mampostería y de cada cara pintada", () => {
     const input: PlanInterpretation = structuredClone(demoInterpretation);
     input.walls = [{ ...input.walls[0], openings: [{ ...input.walls[0].openings[0], quantity: 2 }], paintLeft: true, paintRight: false }];
     const result = calculateMaterials(input);
@@ -41,5 +42,32 @@ describe("motor de cómputo independiente", () => {
     const second = calculateMaterials(input);
     expect(first.lines.find((line) => line.id === "floor")?.quantity).toBe(17);
     expect(second.lines.find((line) => line.id === "floor")?.quantity).toBe(15);
+  });
+
+  it("no calcula cantidades con rendimientos inválidos", () => {
+    const input: PlanInterpretation = structuredClone(demoInterpretation);
+    input.settings.floorCoverageM2PerBox = 0;
+    const result = calculateMaterials(input);
+    const floor = result.lines.find((line) => line.id === "floor");
+    expect(floor?.quantity).toBeNull();
+    expect(floor?.status).toBe("pendiente");
+  });
+
+  it("mantiene parciales las geometrías con aberturas imposibles", () => {
+    const input: PlanInterpretation = structuredClone(demoInterpretation);
+    input.walls[0].openings[0].widthM = 10;
+    input.walls[0].openings[0].heightM = 10;
+    const result = calculateMaterials(input);
+    expect(result.totals.masonryAreaM2).toBe(7.8);
+    expect(result.totals.paintAreaM2).toBe(15.6);
+    expect(result.lines.find((line) => line.id === "brick")?.status).toBe("parcial");
+    expect(result.lines.find((line) => line.id === "paint")?.status).toBe("parcial");
+    expect(result.warnings.some((warning) => warning.includes("aberturas inválidas"))).toBe(true);
+  });
+
+  it("rechaza valores físicos nulos o negativos en la interpretación", () => {
+    const input: PlanInterpretation = structuredClone(demoInterpretation);
+    input.settings.floorCoverageM2PerBox = 0;
+    expect(() => interpretationSchema.parse(input)).toThrow();
   });
 });

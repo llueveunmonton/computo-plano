@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const nullableNumber = z.number().finite().nonnegative().nullable();
+const nullableNumber = z.number().finite().positive().nullable();
 const status = z.enum(["detectado", "confirmado", "supuesto", "pendiente"]);
 
 export const evidenceSchema = z.object({
