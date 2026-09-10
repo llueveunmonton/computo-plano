@@ -11,9 +11,7 @@ MVP funcional en Next.js + TypeScript para pasar de un plano arquitectónico a u
 5. El motor de cálculo está separado de la IA. Cuenta cada muro una vez, descuenta aberturas, calcula caras de pintura seleccionadas y conserva cómputos parciales.
 6. El proyecto y el archivo original se guardan en `data/material-plans/`. Se puede descargar un respaldo JSON y exportar el cómputo a CSV.
 
-Sin API key, el MVP no simula una lectura nueva: el botón `EJEMPLO DEMO` abre un caso conocido y explícitamente rotulado.
-
-La tarjeta DEMO incluye `public/demo/simple-house-floor-plan.png`, un plano sencillo liberado al dominio público por su autor en Wikimedia Commons. Se puede arrastrar hasta la zona de entrada o cargarlo desde la propia tarjeta. Fuente y licencia: [Wikimedia Commons · Simple house floor plan](https://commons.wikimedia.org/wiki/File:Simple_house_floor_plan.gif), dominio público.
+La interfaz pública sólo muestra el flujo de carga real. Sin API key, los archivos nuevos se rechazan con una explicación clara y no se simula ningún análisis.
 
 ## Arranque
 
@@ -54,7 +52,7 @@ La suite incluye 11 pruebas: fórmulas conocidas, unidades, aberturas, caras de 
 - La IA propone posiciones y elementos; las posiciones no son mediciones exactas. Las cotas explícitas tienen prioridad.
 - No se calibra por escala impresa ni por píxeles sobre una fotografía con perspectiva. Una imagen no utilizable debe reemplazarse o corregirse antes de enviarla.
 - El endpoint recibe PDFs y una página seleccionada, pero la extracción de página visual la realiza el proveedor; si el modelo no puede inspeccionarla, debe devolver la duda y no inventar datos.
-- Los valores de rendimiento, manos y desperdicio del demo son supuestos editables, no especificaciones de obra.
+- Los valores de rendimiento, manos y desperdicio de los ejemplos de prueba son supuestos editables, no especificaciones de obra.
 - No incluye estructura, instalaciones, precios, pagos ni aprobación para obra.
 - El almacenamiento local está pensado para un equipo o servidor único. En Vercel se usa `/tmp`, que es temporal por instancia; para producción hace falta reemplazarlo por Blob/S3 y una base persistente. También se necesita autenticación, control de acceso, backups operativos, antivirus/escaneo de archivos, retención y una política de privacidad.
 - El rate limit actual es en memoria y por origen; debe reemplazarse por un límite distribuido antes de exponerlo públicamente.
