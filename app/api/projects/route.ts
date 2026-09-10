@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) return NextResponse.json({ error: "Seleccioná un JPG, PNG o PDF." }, { status: 400 });
   if (!accepted.has(file.type)) return NextResponse.json({ error: "Formato no admitido. Usá JPG, PNG o PDF." }, { status: 415 });
   if (file.size === 0 || file.size > MAX_FILE_BYTES) return NextResponse.json({ error: "El archivo debe pesar entre 1 byte y 15 MB." }, { status: 413 });
-  if (!visionIsConfigured()) return NextResponse.json({ error: "Falta OPENAI_API_KEY: no se puede analizar un archivo nuevo. Abrí un ejemplo demo para probar el flujo." }, { status: 503 });
+  if (!visionIsConfigured()) return NextResponse.json({ error: "Falta configurar OPENAI_API_KEY en el servidor. No se puede analizar un archivo nuevo hasta configurarla." }, { status: 503 });
   const selectedPageRaw = form.get("selectedPage");
   const selectedPage = file.type === "application/pdf" ? Math.max(1, Number(selectedPageRaw || 1)) : null;
   if (file.type === "application/pdf" && (selectedPage === null || !Number.isInteger(selectedPage) || selectedPage > 100)) return NextResponse.json({ error: "Indicá una página PDF válida entre 1 y 100." }, { status: 400 });
