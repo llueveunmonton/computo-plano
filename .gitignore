@@ -1,0 +1,17 @@
+node_modules
+.next
+prisma/*.db
+prisma/*.db-journal
+test-results
+playwright-report
+coverage
+.env.local
+.env
+.vercel
+*.tsbuildinfo
+test-results
+playwright-report
+.env*
+.agents/
+skills-lock.json
+data/material-plans/

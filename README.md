@@ -1,0 +1,60 @@
+# Cómputo/Plano
+
+MVP funcional en Next.js + TypeScript para pasar de un plano arquitectónico a un cómputo editable de pisos/cerámicos, ladrillos y pintura.
+
+## Flujo implementado
+
+1. Se carga JPG, PNG o PDF y, para imágenes, se puede rotar o recortar bordes antes de enviar.
+2. El servidor valida tipo, tamaño, página PDF, límite de solicitudes y responde con error si falta configuración.
+3. Con `OPENAI_API_KEY`, el servidor envía el plano al proveedor de visión configurable y exige un JSON Schema validado con ambientes, muros, aberturas, evidencia, faltantes y preguntas.
+4. La interfaz muestra el plano, referencias visuales, estados `detectado`, `confirmado`, `supuesto` y `pendiente`, y una revisión editable.
+5. El motor de cálculo está separado de la IA. Cuenta cada muro una vez, descuenta aberturas, calcula caras de pintura seleccionadas y conserva cómputos parciales.
+6. El proyecto y el archivo original se guardan en `data/material-plans/`. Se puede descargar un respaldo JSON y exportar el cómputo a CSV.
+
+Sin API key, el MVP no simula una lectura nueva: el botón `EJEMPLO DEMO` abre un caso conocido y explícitamente rotulado.
+
+La tarjeta DEMO incluye `public/demo/simple-house-floor-plan.png`, un plano sencillo liberado al dominio público por su autor en Wikimedia Commons. Se puede arrastrar hasta la zona de entrada o cargarlo desde la propia tarjeta. Fuente y licencia: [Wikimedia Commons · Simple house floor plan](https://commons.wikimedia.org/wiki/File:Simple_house_floor_plan.gif), dominio público.
+
+## Arranque
+
+Requisitos: Node.js 20.9+ y npm.
+
+```bash
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Abrir <http://localhost:3000>.
+
+Configuración mínima para lectura real:
+
+```dotenv
+OPENAI_API_KEY="..."
+VISION_MODEL="gpt-4.1-mini"
+# opcional, para un endpoint compatible con Responses API
+VISION_API_URL="https://api.openai.com/v1/responses"
+```
+
+La clave nunca llega al navegador. El archivo sí se envía al proveedor de IA configurado; la interfaz lo informa antes de usar el flujo. El proyecto y el original quedan además en almacenamiento local.
+
+## Verificación
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+La suite incluye 11 pruebas: fórmulas conocidas, unidades, aberturas, caras de pintura, faltantes, cómputo parcial y recalculado de supuestos, además de las pruebas heredadas de integridad de la base anterior.
+
+## Limitaciones conocidas
+
+- La lectura real depende de la API de visión y del proveedor/modelo configurados. No se afirma una precisión que no haya sido medida.
+- La IA propone posiciones y elementos; las posiciones no son mediciones exactas. Las cotas explícitas tienen prioridad.
+- No se calibra por escala impresa ni por píxeles sobre una fotografía con perspectiva. Una imagen no utilizable debe reemplazarse o corregirse antes de enviarla.
+- El endpoint recibe PDFs y una página seleccionada, pero la extracción de página visual la realiza el proveedor; si el modelo no puede inspeccionarla, debe devolver la duda y no inventar datos.
+- Los valores de rendimiento, manos y desperdicio del demo son supuestos editables, no especificaciones de obra.
+- No incluye estructura, instalaciones, precios, pagos ni aprobación para obra.
+- El almacenamiento local está pensado para un equipo o servidor único. En Vercel se usa `/tmp`, que es temporal por instancia; para producción hace falta reemplazarlo por Blob/S3 y una base persistente. También se necesita autenticación, control de acceso, backups operativos, antivirus/escaneo de archivos, retención y una política de privacidad.
+- El rate limit actual es en memoria y por origen; debe reemplazarse por un límite distribuido antes de exponerlo públicamente.
