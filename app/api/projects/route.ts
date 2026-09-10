@@ -9,6 +9,17 @@ export const runtime = "nodejs";
 
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const accepted = new Set(["image/jpeg", "image/png", "application/pdf"]);
+
+function extractionErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "VISION_API_KEY_MISSING") return "Falta configurar OPENAI_API_KEY en Vercel. No se puede analizar un archivo nuevo hasta configurarla.";
+  if (message.startsWith("VISION_PROVIDER_401") || message.startsWith("VISION_PROVIDER_403")) return "OPENAI_API_KEY fue rechazada por el proveedor. Revisá que sea válida y tenga acceso al modelo configurado.";
+  if (message.startsWith("VISION_PROVIDER_429")) return "El proveedor rechazó la solicitud por límite o saldo insuficiente. Revisá la cuota de la cuenta de IA.";
+  if (message === "VISION_INVALID_JSON") return "El proveedor devolvió una respuesta que no cumple el formato esperado.";
+  if (message === "VISION_EMPTY_RESPONSE") return "La API no devolvió una interpretación utilizable.";
+  return "No se pudo interpretar el plano. Revisá legibilidad, orientación y perspectiva, y probá otra imagen.";
+}
+
 export async function GET() {
   return NextResponse.json({ projects: await listProjects(), visionConfigured: visionIsConfigured() });
 }
@@ -35,7 +46,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ project });
   } catch (error) {
     console.error("plan extraction failed", error);
-    const message = error instanceof Error && error.message === "VISION_EMPTY_RESPONSE" ? "La API no devolvió una interpretación utilizable." : "No se pudo interpretar el plano. Revisá legibilidad, orientación y perspectiva, y probá otra imagen.";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return NextResponse.json({ error: extractionErrorMessage(error) }, { status: 502 });
   }
 }
