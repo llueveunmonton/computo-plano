@@ -45,7 +45,7 @@ describe("contrato del proveedor de visión", () => {
 
     expect(visionIsConfigured()).toBe(true);
     expect(result.rooms[0].name).toBe("Monoambiente");
-    expect(vi.mocked(fetch).mock.calls[0][0]).toContain("generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
+    expect(vi.mocked(fetch).mock.calls[0][0]).toContain("generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent");
     expect((geminiJsonSchema.properties.walls.items as any).properties.openings.items.properties.type.type).toBe("STRING");
   });
 });

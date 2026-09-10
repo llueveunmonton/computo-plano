@@ -39,7 +39,7 @@ Alternativa con Google AI Studio:
 ```dotenv
 VISION_PROVIDER="gemini"
 GEMINI_API_KEY="..."
-GEMINI_MODEL="gemini-2.5-flash"
+GEMINI_MODEL="gemini-3.6-flash"
 ```
 
 La clave nunca llega al navegador. El archivo sí se envía al proveedor de IA configurado; la interfaz lo informa antes de usar el flujo. El proyecto y el original quedan además en almacenamiento local.

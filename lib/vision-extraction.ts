@@ -71,7 +71,7 @@ async function extractWithOpenAI(input: VisionInput, apiKey: string): Promise<Pl
 }
 
 async function extractWithGemini(input: VisionInput, apiKey: string): Promise<PlanInterpretation> {
-  const model = environmentValue(process.env.GEMINI_MODEL) || "gemini-2.5-flash";
+  const model = environmentValue(process.env.GEMINI_MODEL) || "gemini-3.6-flash";
   const baseUrl = environmentValue(process.env.GEMINI_API_URL) || DEFAULT_GEMINI_API_URL;
   const endpoint = `${baseUrl.replace(/\/$/, "")}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const payload = await requestJson(endpoint, {
