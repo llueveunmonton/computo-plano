@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   calculateMaterials,
+  type CalculationResult,
   type Fixture,
   type PlanInterpretation,
   type PlanProject,
@@ -446,6 +447,7 @@ export default function Home() {
       {message && <div className={`message message-${message.kind}`}><b>{message.kind === "error" ? "!" : message.kind === "success" ? "✓" : "i"}</b><span>{message.text}</span></div>}
 
       {!project && (busy ? <AnalysisCard analysisStep={analysisStep} analysisSteps={analysisSteps} /> : <Landing onDemo={openDemo} busy={busy} file={file} dropActive={dropActive} setDropActive={setDropActive} setSelectedFile={setSelectedFile} selectFile={selectFile} fileInput={fileInput} upload={upload} rotation={rotation} setRotation={setRotation} cropInset={cropInset} setCropInset={setCropInset} contrast={contrast} setContrast={setContrast} selectedPage={selectedPage} setSelectedPage={setSelectedPage} knownDimension={knownDimension} setKnownDimension={setKnownDimension} knownUnit={knownUnit} setKnownUnit={setKnownUnit} />)}
+      {project && stage === "review" && calculationPreview && <CalculationPreview calculation={calculationPreview} />}
       {project && <ProjectFlow project={project} previewUrl={previewUrl} stage={stage} setStage={setStage} busy={busy} analysisStep={analysisStep} analysisSteps={analysisSteps} selectedEvidence={selectedEvidence} setSelectedEvidence={setSelectedEvidence} pendingCount={pendingCount} updateRoom={updateRoom} updateWall={updateWall} updateFixture={updateFixture} updateSetting={updateSetting} updateInterpretation={updateInterpretation} confirmEverything={confirmEverything} addFixture={addFixture} addFeedback={addFeedback} showDetails={showDetails} setShowDetails={setShowDetails} calculate={calculate} calculationPreview={calculationPreview} exportCsv={exportCsv} />}
 
       {projects.length > 0 && <section className="recent"><div><p className="eyebrow">ARCHIVO LOCAL</p><h2>Proyectos recientes</h2></div><div className="recent-list">{projects.slice(0, 4).map((item) => <button className={`recent-item ${project?.id === item.id ? "selected" : ""}`} key={item.id} onClick={() => { setProject(item); setPreviewUrl(item.isDemo ? samplePlan : null); setStage(item.calculation ? "materials" : "review"); }}>{item.isDemo ? "DEMO" : "PLANO"}<span><strong>{item.name}</strong><small>{dateLabel(item.updatedAt)}</small></span><b>→</b></button>)}</div></section>}
@@ -478,6 +480,18 @@ function InfoBlock({ title, items }: { title: string; items: string[] }) {
 
 function HowToTry() {
   return <div className="try-guide"><p className="eyebrow">CÓMO PROBAR ESTA BETA</p><ol><li>Elegí un plano de un solo baño con una medida.</li><li>Confirmá medidas y alturas.</li><li>Revisá lo estimado y exportá el cómputo.</li></ol></div>;
+}
+
+function CalculationPreview({ calculation }: { calculation: CalculationResult }) {
+  const categoryLabels: Record<CalculationResult["lines"][number]["category"], string> = {
+    terminaciones: "Terminaciones",
+    sanitaria: "Sanitaria",
+    electrica: "Eléctrica",
+    artefactos: "Artefactos",
+  };
+  const categories = [...new Set(calculation.lines.map((line) => line.category))];
+  const headlineLines = calculation.lines.filter((line) => ["floor", "wall-tile", "cold-water", "electrical-cable"].includes(line.id));
+  return <section className="calculation-preview"><div className="preview-intro"><p className="eyebrow">ANTES DE CONFIRMAR · VISTA PREVIA</p><h2>El cómputo ya tiene una dirección.</h2><p>Esto es una primera aproximación con lo que pudimos leer. Mirá si las superficies y las categorías tienen sentido antes de completar los datos faltantes.</p></div><div className="preview-totals"><div><span>Piso neto</span><strong>{decimal(calculation.totals.floorAreaM2)} <small>m²</small></strong></div><div><span>Paredes netas</span><strong>{decimal(calculation.totals.masonryAreaM2)} <small>m²</small></strong></div><div><span>Con categorías</span><strong>{categories.length} <small>de 4</small></strong></div></div><div className="preview-lines">{headlineLines.map((line) => <div key={line.id}><span className={`preview-status ${statusClass[line.confidence]}`} /> <strong>{line.material}</strong><b>{line.quantity === null ? "pendiente" : `${decimal(line.quantity)} ${line.unit}`}</b><small>{line.confidence === "supuesto" ? "estimado por plantilla" : line.sourceLabel.toLowerCase()}</small></div>)}</div><div className="preview-foot"><span>{categories.map((category) => categoryLabels[category]).join(" · ")}</span><strong>Las decisiones pueden cambiar estas cantidades.</strong></div></section>;
 }
 
 function ProjectFlow({ project, previewUrl, stage, setStage, busy, analysisStep, analysisSteps, selectedEvidence, setSelectedEvidence, pendingCount, updateRoom, updateWall, updateFixture, updateSetting, updateInterpretation, confirmEverything, addFixture, addFeedback, showDetails, setShowDetails, calculate, calculationPreview, exportCsv }: any) {

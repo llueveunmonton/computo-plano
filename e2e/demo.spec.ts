@@ -12,6 +12,8 @@ test("el ejemplo de baño funciona hasta el cómputo", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Ver ejemplo completo →" }).click();
   await expect(page.getByText("EJEMPLO COMPLETO", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "El cómputo ya tiene una dirección." })).toBeVisible();
+  await expect(page.getByText("Las decisiones pueden cambiar estas cantidades.")).toBeVisible();
   await page.getByRole("button", { name: "Continuar con datos →" }).click();
   await expect(page.getByRole("heading", { name: "Completemos lo que el plano no muestra." })).toBeVisible();
   await page.getByRole("button", { name: "Ver cómputo →" }).click({ force: true });
