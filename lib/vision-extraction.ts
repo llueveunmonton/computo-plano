@@ -26,7 +26,17 @@ function pageNote(input: VisionInput) {
 function parseInterpretation(text: string | null) {
   if (!text) throw new Error("VISION_EMPTY_RESPONSE");
   try {
-    const parsed = interpretationSchema.parse(JSON.parse(text));
+    const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+    let jsonText = cleaned;
+    try {
+      JSON.parse(jsonText);
+    } catch {
+      const start = cleaned.indexOf("{");
+      const end = cleaned.lastIndexOf("}");
+      if (start < 0 || end <= start) throw new Error("VISION_INVALID_JSON");
+      jsonText = cleaned.slice(start, end + 1);
+    }
+    const parsed = interpretationSchema.parse(JSON.parse(jsonText));
     return {
       ...parsed,
       settings: {
@@ -94,7 +104,7 @@ async function extractWithGemini(input: VisionInput, apiKey: string): Promise<Pl
   const payload = await requestJson(endpoint, {
     systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTIONS }] },
     contents: [{ role: "user", parts: [{ text: pageNote(input) }, { inlineData: { mimeType: input.mimeType, data: input.bytes.toString("base64") } }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 4096, responseMimeType: "application/json", responseSchema: geminiJsonSchema },
+    generationConfig: { temperature: 0, maxOutputTokens: 8192, responseMimeType: "application/json", responseSchema: geminiJsonSchema },
   }, { "Content-Type": "application/json" }, 180_000);
   return parseInterpretation(extractGeminiText(payload));
 }

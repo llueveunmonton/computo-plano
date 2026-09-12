@@ -22,6 +22,16 @@ describe("contrato del proveedor de visión", () => {
     expect(result.rooms[0].name).toBe("Monoambiente");
   });
 
+  it("tolera JSON envuelto en un bloque Markdown", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "'sk-test'");
+    const fenced = "```json\n" + JSON.stringify(demoInterpretation) + "\n```";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ output_text: fenced }), { status: 200 })));
+
+    const result = await extractPlanWithVision(requestInput);
+
+    expect(result.rooms[0].name).toBe("Monoambiente");
+  });
+
   it("propaga el rechazo de autenticación para mostrar un diagnóstico útil", async () => {
     vi.stubEnv("OPENAI_API_KEY", "sk-invalid");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("unauthorized", { status: 401 })));
