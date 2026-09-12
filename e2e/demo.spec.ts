@@ -1,27 +1,31 @@
 import { test, expect } from "@playwright/test";
 
-test("flujo inicial: carga real sin demo visible", async ({ page }) => {
+test("flujo inicial: alcance de beta y carga guiada", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Del plano al cómputo, sin perder el criterio." })).toBeVisible();
-  await expect(page.locator(".demo-box")).toBeHidden();
-  await expect(page.locator(".awaiting p")).toBeVisible();
-  await expect.poll(async () => page.locator(".awaiting p").evaluate((element) => getComputedStyle(element, "::after").content)).toBe('"Elegí un archivo para empezar."');
-  await expect(page.getByRole("button", { name: "Interpretar plano →" })).toBeDisabled();
+  await expect(page.getByText("Beta de prueba: por ahora analizamos únicamente planos de baños.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Empezá por una imagen que podamos leer." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ver ejemplo completo →" })).toBeVisible();
+  await expect(page.getByText("Funciona mejor con")).toBeVisible();
 });
 
-test("el aviso demo no comprime ni desborda el texto", async ({ page }) => {
+test("el ejemplo de baño funciona hasta el cómputo", async ({ page }) => {
   await page.goto("/");
-  await page.locator(".demo-box button").evaluate((button) => (button as HTMLButtonElement).click());
-  const bannerText = page.locator(".banner > span");
-  await expect(bannerText).toContainText("EJEMPLO DEMO");
-  await expect.poll(async () => bannerText.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(100);
+  await page.getByRole("button", { name: "Ver ejemplo completo →" }).click();
+  await expect(page.getByText("EJEMPLO COMPLETO", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Continuar con datos →" }).click();
+  await expect(page.getByRole("heading", { name: "Completemos lo que el plano no muestra." })).toBeVisible();
+  await page.getByRole("button", { name: "Ver cómputo →" }).click({ force: true });
+  await expect(page.getByRole("heading", { name: "Materiales con historia." })).toBeVisible();
+  await expect(page.getByText("Instalación sanitaria")).toBeVisible();
+  await expect(page.getByText("¿Por qué?", { exact: true }).first()).toBeVisible();
 });
 
-test("mantiene la revisión avanzada cerrada hasta solicitarla", async ({ page }) => {
+test("permite editar un supuesto y volver a materiales", async ({ page }) => {
   await page.goto("/");
-  await page.locator(".demo-box button").evaluate((button) => (button as HTMLButtonElement).click());
-  await expect(page.getByRole("button", { name: "Revisar muros y rendimientos" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Superficies de piso" })).toBeHidden();
-  await page.getByRole("button", { name: "Revisar muros y rendimientos" }).click();
-  await expect(page.getByRole("heading", { name: "Superficies de piso" })).toBeVisible();
+  await page.getByRole("button", { name: "Ver ejemplo completo →" }).click();
+  await page.getByRole("button", { name: "Continuar con datos →" }).click();
+  const height = page.getByRole("spinbutton").first();
+  await height.fill("2.60");
+  await page.getByRole("button", { name: "Ver cómputo →" }).click({ force: true });
+  await expect(page.getByText("Resultado preliminar")).toBeVisible();
 });

@@ -39,11 +39,13 @@ export async function POST(request: Request) {
   const selectedPageRaw = form.get("selectedPage");
   const selectedPage = file.type === "application/pdf" ? Math.max(1, Number(selectedPageRaw || 1)) : null;
   if (file.type === "application/pdf" && (selectedPage === null || !Number.isInteger(selectedPage) || selectedPage > 100)) return NextResponse.json({ error: "Indicá una página PDF válida entre 1 y 100." }, { status: 400 });
+  const knownDimensionRaw = form.get("knownDimensionM");
+  const knownDimensionM = typeof knownDimensionRaw === "string" && Number.isFinite(Number(knownDimensionRaw)) && Number(knownDimensionRaw) > 0 ? Number(knownDimensionRaw) : null;
   const bytes = Buffer.from(await file.arrayBuffer());
   const id = randomUUID();
   const storedName = `${id}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
   try {
-    const interpretation = await extractPlanWithVision({ bytes, mimeType: file.type, fileName: file.name, selectedPage });
+    const interpretation = await extractPlanWithVision({ bytes, mimeType: file.type, fileName: file.name, selectedPage, knownDimensionM });
     const project: PlanProject = { id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), name: file.name.replace(/\.[^.]+$/, ""), originalFileName: file.name, fileType: file.type, filePath: `data/material-plans/uploads/${storedName}`, selectedPage, isDemo: false, extractionMode: "vision", interpretation, calculation: null };
     await ensurePlanStorage();
     await (await import("node:fs/promises")).writeFile(uploadPath(storedName), bytes);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateMaterials, demoInterpretation, type PlanInterpretation } from "@/lib/plan";
+import { bathroomDemoInterpretation, calculateMaterials, demoInterpretation, type PlanInterpretation } from "@/lib/plan";
 import { interpretationSchema } from "@/lib/plan-schema";
 
 describe("motor de cómputo independiente", () => {
@@ -83,5 +83,15 @@ describe("motor de cómputo independiente", () => {
     input.walls = input.walls.slice(0, 3);
     const result = calculateMaterials(input);
     expect(result.warnings.some((warning) => warning.includes("perímetro"))).toBe(true);
+  });
+
+  it("calcula las categorías de un baño y marca las instalaciones estimadas", () => {
+    const result = calculateMaterials(bathroomDemoInterpretation);
+    expect(result.totals.floorAreaM2).toBe(5.28);
+    expect(result.lines.find((line) => line.id === "wall-tile")?.quantity).toBe(11);
+    expect(result.lines.find((line) => line.id === "cold-water")?.quantity).toBe(6.6);
+    expect(result.lines.find((line) => line.id === "cold-water")?.confidence).toBe("supuesto");
+    expect(result.lines.some((line) => line.category === "artefactos" && line.material === "Inodoro")).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes("plantilla estándar"))).toBe(true);
   });
 });

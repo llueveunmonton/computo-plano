@@ -2,6 +2,8 @@ import { z } from "zod";
 
 const nullableNumber = z.number().finite().positive().nullable();
 const status = z.enum(["detectado", "confirmado", "supuesto", "pendiente"]);
+const fixtureType = z.enum(["inodoro", "lavatorio", "bidet", "ducha", "bañera", "canilla_lavatorio", "mezcladora_ducha", "duchador", "extractor", "luminaria", "tomacorriente", "interruptor", "rejilla"]);
+const installationKind = z.enum(["agua_fria", "agua_caliente", "desague", "iluminacion", "toma", "tierra", "corrugado"]);
 
 export const evidenceSchema = z.object({
   id: z.string().min(1).max(80),
@@ -63,7 +65,20 @@ export const interpretationSchema = z.object({
     paintCoverageM2PerL: nullableNumber,
     paintCoats: nullableNumber,
     paintWastePercent: z.number().finite().min(0).max(100),
+    wallTileCoverageM2PerBox: nullableNumber.optional(),
+    wallTileWastePercent: z.number().finite().min(0).max(100).nullable().optional(),
+    adhesiveKgPerM2: nullableNumber.optional(),
+    groutKgPerM2: nullableNumber.optional(),
+    waterproofingKgPerM2: nullableNumber.optional(),
+    sanitaryTemplateM: nullableNumber.optional(),
+    electricalTemplateM: nullableNumber.optional(),
+    sanitaryWastePercent: z.number().finite().min(0).max(100).nullable().optional(),
+    electricalWastePercent: z.number().finite().min(0).max(100).nullable().optional(),
+    installationMode: z.enum(["plantilla", "manual", "plano_sanitario", "plano_electrico"]).optional(),
   }),
+  fixtures: z.array(z.object({ id: z.string().min(1).max(80), type: fixtureType, label: z.string().min(1).max(120), quantity: z.number().int().positive().max(100), state: status, evidenceId: z.string().nullable() })).max(100).default([]),
+  installationRuns: z.array(z.object({ id: z.string().min(1).max(80), kind: installationKind, lengthM: nullableNumber, quantity: z.number().int().positive().max(100), diameter: z.string().nullable().optional(), state: status, evidenceId: z.string().nullable() })).max(100).default([]),
+  bathroomStatus: z.enum(["probable", "incierto", "no_baño"]).default("probable"),
 });
 
 export type ValidatedInterpretation = z.infer<typeof interpretationSchema>;
@@ -71,12 +86,15 @@ export type ValidatedInterpretation = z.infer<typeof interpretationSchema>;
 export const visionJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["orientation", "perspective", "rooms", "walls", "evidence", "unknowns", "questions", "settings"],
+  required: ["orientation", "bathroomStatus", "perspective", "rooms", "walls", "fixtures", "installationRuns", "evidence", "unknowns", "questions", "settings"],
   properties: {
-    orientation: { type: "string", enum: ["válida", "incierta", "no_utilizable"] },
+     orientation: { type: "string", enum: ["válida", "incierta", "no_utilizable"] },
+     bathroomStatus: { type: "string", enum: ["probable", "incierto", "no_baño"] },
     perspective: { type: "string", enum: ["corregida", "plana", "incierta"] },
     rooms: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "name", "widthM", "lengthM", "areaM2", "state", "evidenceId"], properties: { id: { type: "string" }, name: { type: "string" }, widthM: { type: ["number", "null"] }, lengthM: { type: ["number", "null"] }, areaM2: { type: ["number", "null"] }, state: { type: "string", enum: ["detectado", "confirmado", "supuesto", "pendiente"] }, evidenceId: { type: ["string", "null"] } } } },
-    walls: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "label", "lengthM", "heightM", "thicknessM", "paintLeft", "paintRight", "state", "evidenceId", "openings"], properties: { id: { type: "string" }, label: { type: "string" }, lengthM: { type: ["number", "null"] }, heightM: { type: ["number", "null"] }, thicknessM: { type: ["number", "null"] }, paintLeft: { type: "boolean" }, paintRight: { type: "boolean" }, state: { type: "string", enum: ["detectado", "confirmado", "supuesto", "pendiente"] }, evidenceId: { type: ["string", "null"] }, openings: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "type", "widthM", "heightM", "quantity", "state", "evidenceId"], properties: { id: { type: "string" }, type: { type: "string", enum: ["puerta", "ventana", "otro"] }, widthM: { type: ["number", "null"] }, heightM: { type: ["number", "null"] }, quantity: { type: "integer" }, state: { type: "string", enum: ["detectado", "confirmado", "supuesto", "pendiente"] }, evidenceId: { type: ["string", "null"] } } } } } } },
+     walls: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "label", "lengthM", "heightM", "thicknessM", "paintLeft", "paintRight", "state", "evidenceId", "openings"], properties: { id: { type: "string" }, label: { type: "string" }, lengthM: { type: ["number", "null"] }, heightM: { type: ["number", "null"] }, thicknessM: { type: ["number", "null"] }, paintLeft: { type: "boolean" }, paintRight: { type: "boolean" }, state: { type: "string", enum: ["detectado", "confirmado", "supuesto", "pendiente"] }, evidenceId: { type: ["string", "null"] }, openings: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "type", "widthM", "heightM", "quantity", "state", "evidenceId"], properties: { id: { type: "string" }, type: { type: "string", enum: ["puerta", "ventana", "otro"] }, widthM: { type: ["number", "null"] }, heightM: { type: ["number", "null"] }, quantity: { type: "integer" }, state: { type: "string", enum: ["detectado", "confirmado", "supuesto", "pendiente"] }, evidenceId: { type: ["string", "null"] } } } } } } },
+    fixtures: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "type", "label", "quantity", "state", "evidenceId"], properties: { id: { type: "string" }, type: { type: "string", enum: ["inodoro", "lavatorio", "bidet", "ducha", "bañera", "canilla_lavatorio", "mezcladora_ducha", "duchador", "extractor", "luminaria", "tomacorriente", "interruptor", "rejilla"] }, label: { type: "string" }, quantity: { type: "integer" }, state: { type: "string", enum: ["detectado", "confirmado", "supuesto", "pendiente"] }, evidenceId: { type: ["string", "null"] } } } },
+    installationRuns: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "kind", "lengthM", "quantity", "state", "evidenceId"], properties: { id: { type: "string" }, kind: { type: "string", enum: ["agua_fria", "agua_caliente", "desague", "iluminacion", "toma", "tierra", "corrugado"] }, lengthM: { type: ["number", "null"] }, quantity: { type: "integer" }, state: { type: "string", enum: ["detectado", "confirmado", "supuesto", "pendiente"] }, evidenceId: { type: ["string", "null"] } } } },
     evidence: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "label", "description", "region"], properties: { id: { type: "string" }, label: { type: "string" }, description: { type: "string" }, region: { type: ["object", "null"], additionalProperties: false, required: ["x", "y", "width", "height"], properties: { x: { type: "number" }, y: { type: "number" }, width: { type: "number" }, height: { type: "number" } } } } } },
     unknowns: { type: "array", items: { type: "string" } },
     questions: { type: "array", items: { type: "string" } },
@@ -107,4 +125,4 @@ function toGeminiSchema(value: unknown): unknown {
   return result;
 }
 
-export const geminiJsonSchema = toGeminiSchema(visionJsonSchema);
+export const geminiJsonSchema = toGeminiSchema(visionJsonSchema) as any;

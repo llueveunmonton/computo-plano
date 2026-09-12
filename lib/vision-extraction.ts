@@ -2,11 +2,11 @@ import "server-only";
 import { geminiJsonSchema, interpretationSchema, visionJsonSchema } from "./plan-schema";
 import type { PlanInterpretation } from "./plan";
 
-const SYSTEM_INSTRUCTIONS = `Sos un perito en lectura de planos arquitectónicos de viviendas simples de una planta. Analizá solamente lo que se ve o está explícitamente acotado. Priorizá cotas legibles y unidades explícitas. Nunca calibres una foto redimensionada usando la escala impresa ni midas por píxeles con perspectiva. Las posiciones son evidencia visual, no mediciones. Usá null si falta un dato. Para cada dato incluí estado detectado, confirmado, supuesto o pendiente. No inventes alturas, materiales ni estructura. Devolvé ambientes, muros únicos, aberturas, cotas y evidencia breve. Si la imagen no es utilizable por desenfoque, orientación o perspectiva, indicá no_utilizable y dejá preguntas concretas.`;
+const SYSTEM_INSTRUCTIONS = `Sos un perito en lectura de planos de baños. Esta beta analiza únicamente un baño por plano. Analizá solamente lo que se ve o está explícitamente acotado. Priorizá cotas legibles y unidades explícitas. Nunca calibres una foto redimensionada usando la escala impresa ni midas por píxeles con perspectiva. Las posiciones son evidencia visual, no mediciones. Usá null si falta un dato. Para cada dato incluí estado detectado, confirmado, supuesto o pendiente. No inventes alturas, materiales, recorridos ni estructura. Devolvé un ambiente de baño, muros únicos, aberturas, artefactos sanitarios, puntos eléctricos, recorridos sólo si están dibujados y evidencia breve. Si la imagen no parece un baño, marcá no_baño y dejá una pregunta concreta. Si la imagen no es utilizable por desenfoque, orientación o perspectiva, indicá no_utilizable y dejá preguntas concretas.`;
 const DEFAULT_OPENAI_API_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta";
 
-type VisionInput = { bytes: Buffer; mimeType: string; fileName: string; selectedPage: number | null };
+type VisionInput = { bytes: Buffer; mimeType: string; fileName: string; selectedPage: number | null; knownDimensionM?: number | null };
 
 function environmentValue(value: string | undefined) {
   return value?.trim().replace(/^("|')|("|')$/g, "") || null;
@@ -17,15 +17,32 @@ function provider() {
 }
 
 function pageNote(input: VisionInput) {
+  const reference = input.knownDimensionM ? ` El usuario informa una medida conocida de ${input.knownDimensionM} m; usala sólo como referencia declarada y dejá la cota como dato a confirmar.` : " Si no hay una medida conocida, dejá la geometría pendiente.";
   return input.mimeType === "application/pdf"
-    ? `El archivo es PDF. Concentrate en la página seleccionada ${input.selectedPage ?? 1}; si no podés inspeccionarla, informalo en preguntas y no inventes datos.`
-    : "La imagen puede haber sido rotada o recortada; evaluá orientación y perspectiva antes de extraer.";
+    ? `El archivo es PDF. Concentrate en la página seleccionada ${input.selectedPage ?? 1}; si no podés inspeccionarla, informalo en preguntas y no inventes datos.${reference}`
+    : `La imagen puede haber sido rotada o recortada; evaluá orientación y perspectiva antes de extraer.${reference}`;
 }
 
 function parseInterpretation(text: string | null) {
   if (!text) throw new Error("VISION_EMPTY_RESPONSE");
   try {
-    return interpretationSchema.parse(JSON.parse(text));
+    const parsed = interpretationSchema.parse(JSON.parse(text));
+    return {
+      ...parsed,
+      settings: {
+        ...parsed.settings,
+        wallTileCoverageM2PerBox: parsed.settings.wallTileCoverageM2PerBox ?? 2,
+        wallTileWastePercent: parsed.settings.wallTileWastePercent ?? 10,
+        adhesiveKgPerM2: parsed.settings.adhesiveKgPerM2 ?? 4,
+        groutKgPerM2: parsed.settings.groutKgPerM2 ?? 0.5,
+        waterproofingKgPerM2: parsed.settings.waterproofingKgPerM2 ?? 1.5,
+        sanitaryTemplateM: parsed.settings.sanitaryTemplateM ?? 18,
+        electricalTemplateM: parsed.settings.electricalTemplateM ?? 12,
+        sanitaryWastePercent: parsed.settings.sanitaryWastePercent ?? 10,
+        electricalWastePercent: parsed.settings.electricalWastePercent ?? 10,
+        installationMode: parsed.settings.installationMode ?? "plantilla",
+      },
+    };
   } catch (error) {
     if (error instanceof SyntaxError) throw new Error("VISION_INVALID_JSON");
     throw error;
